@@ -1,0 +1,24 @@
+{
+  "topics": [
+    {
+      "topic": "AI dashcams for fleet safety",
+      "momentum_score": 92.0
+    },
+    {
+      "topic": "real-time GPS telematics for last-mile delivery",
+      "momentum_score": 88.5
+    },
+    {
+      "topic": "predictive maintenance for commercial fleets",
+      "momentum_score": 85.3
+    },
+    {
+      "topic": "driver behavior monitoring with computer vision",
+      "momentum_score": 79.8
+    },
+    {
+      "topic": "EV fleet electrification and charging infrastructure",
+      "momentum_score": 76.2
+    }
+  ]
+}

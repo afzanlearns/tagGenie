@@ -1,0 +1,34 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --canvas: #0C0C0C;
+  --text: #F0EDE6;
+  --accent: #D42B2B;
+  --font: 'Geist Mono', monospace;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--canvas);
+  color: var(--text);
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  border-radius: 0;
+}
+
+button, input, select, textarea {
+  font-family: var(--font);
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--text);
+}

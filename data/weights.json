@@ -1,0 +1,18 @@
+{
+  "LinkedIn": {
+    "hashtag": 0.24,
+    "keyword": 0.8
+  },
+  "Instagram": {
+    "hashtag": 1.0,
+    "keyword": 0.4
+  },
+  "X": {
+    "hashtag": 0.55,
+    "keyword": 0.46
+  },
+  "TikTok": {
+    "hashtag": 0.48,
+    "keyword": 0.27
+  }
+}

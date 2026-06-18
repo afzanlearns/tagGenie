@@ -1,0 +1,54 @@
+# Sensitive data
+.env
+.env.local
+*.key
+*.pem
+*.cert
+credentials.json
+service-account.json
+secrets.*
+
+# Build prompt spec (internal reference)
+tagGenie_build_prompt.md
+
+# Command code directory
+.commandcode/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Logs
+*.log
+
+# SQLite databases (feedback data)
+*.db
+*.sqlite
+
+# Node
+node_modules/
+frontend/dist/
+
+# Vector store data
+data/chromadb/
+data/chroma_db/
+data/seed_corpus.json
+data/sample_topics.json

@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+keybert
+spacy
+sentence-transformers
+chromadb
+groq
+pytrends
+apscheduler
+pydantic
+python-dotenv
+numpy
+scikit-learn
