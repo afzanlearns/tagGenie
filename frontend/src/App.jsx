@@ -261,48 +261,224 @@ export default function App({ onLogout }) {
 }
 
 function CustomNichePanel({ onCreated, onClose }) {
+  const [step, setStep] = useState('input')
   const [nicheId, setNicheId] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [description, setDescription] = useState('')
   const [postsText, setPostsText] = useState('')
-  const [creating, setCreating] = useState(false)
+  const [generating, setGenerating] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
-  const handleCreate = async () => {
-    const samplePosts = postsText
-      .split('\n')
-      .map(p => p.trim())
-      .filter(p => p.length > 10)
+  const [draft, setDraft] = useState(null)
+  const [editCorpus, setEditCorpus] = useState('')
+  const [editJargon, setEditJargon] = useState('')
+  const [editTopics, setEditTopics] = useState('')
 
-    if (samplePosts.length < 20) {
-      setError(`Need at least 20 sample posts (got ${samplePosts.length})`)
+  const samplePosts = () => postsText
+    .split('\n')
+    .map(p => p.trim())
+    .filter(p => p.length > 10)
+
+  const handleGenerate = async () => {
+    const posts = samplePosts()
+    if (posts.length < 5) {
+      setError(`Need at least 5 sample posts (got ${posts.length})`)
       return
     }
-
-    setCreating(true)
+    setGenerating(true)
     setError('')
     try {
-      const res = await fetch('/api/niches/create', {
+      const res = await fetch('/api/niches/generate-draft', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           niche_id: nicheId.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-'),
           display_name: displayName.trim(),
-          description: description.trim(),
-          sample_posts: samplePosts,
+          sample_posts: posts,
         }),
       })
       if (!res.ok) {
         const data = await res.json()
-        throw new Error(data.detail || 'Creation failed')
+        throw new Error(data.detail || 'Generation failed')
+      }
+      const data = await res.json()
+      const d = data.draft
+      setDraft(d)
+      setEditCorpus(d.corpus ? d.corpus.join('\n') : '')
+      setEditJargon(JSON.stringify(d.jargon || {}, null, 2))
+      setEditTopics(d.sample_topics ? d.sample_topics.join('\n') : '')
+      setDescription(d.description || '')
+      setStep('review')
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  const handleSave = async () => {
+    const corpus = editCorpus.split('\n').map(l => l.trim()).filter(l => l.length > 5)
+    const topics = editTopics.split('\n').map(l => l.trim()).filter(l => l.length > 2)
+    let jargon
+    try {
+      jargon = JSON.parse(editJargon)
+    } catch {
+      setError('Invalid JSON in jargon field')
+      return
+    }
+    if (corpus.length < 3) {
+      setError('Need at least 3 corpus entries')
+      return
+    }
+    setSaving(true)
+    setError('')
+    try {
+      const res = await fetch('/api/niches/save-draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          niche_id: draft.niche_id,
+          display_name: draft.display_name,
+          description: description.trim(),
+          sample_posts: draft.sample_posts,
+          corpus,
+          jargon,
+          sample_topics: topics,
+        }),
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.detail || 'Save failed')
       }
       const data = await res.json()
       onCreated(data.niche)
     } catch (e) {
       setError(e.message)
     } finally {
-      setCreating(false)
+      setSaving(false)
     }
+  }
+
+  if (step === 'review' && draft) {
+    return (
+      <div className="border p-6 mt-4" style={{ borderColor: 'var(--accent)' }}>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <span className="text-xs px-2 py-0.5" style={{ backgroundColor: 'var(--accent)', color: 'var(--text)' }}>
+              REVIEW NICHE: {draft.display_name}
+            </span>
+            <span className="text-xs" style={{ color: '#555' }}>
+              Edit the auto-generated content before saving
+            </span>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setStep('input')}
+              className="text-xs px-3 py-1"
+              style={{ backgroundColor: 'transparent', border: '1px solid #333', color: '#888', cursor: 'pointer' }}
+            >
+              ← BACK
+            </button>
+            <button
+              onClick={onClose}
+              className="text-xs px-3 py-1"
+              style={{ backgroundColor: 'transparent', border: '1px solid #333', color: '#555', cursor: 'pointer' }}
+            >
+              CANCEL
+            </button>
+          </div>
+        </div>
+
+        <div className="mb-4">
+          <label className="block text-xs mb-1.5" style={{ color: '#555' }}>DESCRIPTION</label>
+          <input
+            type="text"
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+            className="w-full px-3 py-2 text-sm border focus:outline-none"
+            style={{ backgroundColor: 'transparent', borderColor: '#333', color: 'var(--text)' }}
+          />
+        </div>
+
+        <div className="mb-4">
+          <label className="block text-xs mb-1.5" style={{ color: '#555' }}>
+            SAMPLE TOPICS (one per line)
+          </label>
+          <textarea
+            value={editTopics}
+            onChange={e => setEditTopics(e.target.value)}
+            rows={3}
+            className="w-full px-3 py-2 text-sm border focus:outline-none"
+            style={{ backgroundColor: 'transparent', borderColor: '#333', color: 'var(--text)', resize: 'vertical' }}
+          />
+        </div>
+
+        <div className="mb-4">
+          <label className="block text-xs mb-1.5" style={{ color: '#555' }}>
+            CORPUS / SEED POSTS (one per line, editable)
+          </label>
+          <textarea
+            value={editCorpus}
+            onChange={e => setEditCorpus(e.target.value)}
+            rows={8}
+            className="w-full px-3 py-2 text-sm border focus:outline-none font-mono"
+            style={{ backgroundColor: 'transparent', borderColor: '#333', color: 'var(--text)', resize: 'vertical', fontSize: '11px' }}
+          />
+        </div>
+
+        <div className="mb-4">
+          <label className="block text-xs mb-1.5" style={{ color: '#555' }}>
+            JARGON (JSON, editable)
+          </label>
+          <textarea
+            value={editJargon}
+            onChange={e => setEditJargon(e.target.value)}
+            rows={10}
+            className="w-full px-3 py-2 text-sm border focus:outline-none font-mono"
+            style={{ backgroundColor: 'transparent', borderColor: '#333', color: 'var(--text)', resize: 'vertical', fontSize: '11px' }}
+          />
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="px-6 py-2 text-xs font-medium disabled:opacity-30"
+            style={{
+              backgroundColor: 'var(--accent)',
+              color: 'var(--text)',
+              border: 'none',
+              cursor: saving ? 'wait' : 'pointer',
+            }}
+          >
+            {saving ? 'SAVING...' : 'SAVE NICHE'}
+          </button>
+          <button
+            onClick={() => setStep('input')}
+            className="px-4 py-2 text-xs"
+            style={{ backgroundColor: 'transparent', border: '1px solid #333', color: '#888', cursor: 'pointer' }}
+          >
+            REGENERATE
+          </button>
+          <span className="text-xs" style={{ color: '#555' }}>
+            {editCorpus.split('\n').filter(l => l.trim().length > 5).length} corpus entries
+          </span>
+        </div>
+
+        {draft._fallback && (
+          <div className="mt-3 text-xs" style={{ color: '#aa6' }}>
+            LLM unavailable, used heuristic fallback. Review the generated content carefully.
+          </div>
+        )}
+
+        {error && (
+          <div className="mt-3 text-xs" style={{ color: 'var(--accent)' }}>
+            {error}
+          </div>
+        )}
+      </div>
+    )
   }
 
   return (
@@ -313,7 +489,7 @@ function CustomNichePanel({ onCreated, onClose }) {
             CREATE CUSTOM NICHE
           </span>
           <span className="text-xs" style={{ color: '#555' }}>
-            Paste 20+ sample posts from your industry to auto-generate a niche
+            Paste 5+ sample posts to generate a draft, then review before saving
           </span>
         </div>
         <button
@@ -363,12 +539,12 @@ function CustomNichePanel({ onCreated, onClose }) {
 
       <div className="mb-4">
         <label className="block text-xs mb-1.5" style={{ color: '#555' }}>
-          SAMPLE POSTS (one per line, minimum 20)
+          SAMPLE POSTS (one per line, minimum 5)
         </label>
         <textarea
           value={postsText}
           onChange={e => setPostsText(e.target.value)}
-          placeholder="Paste one social media post per line from your industry&#10;Each post should be a realistic example of content relevant to your niche&#10;Min 20 posts required..."
+          placeholder="Paste one social media post per line from your industry&#10;Each post should be a realistic example of content relevant to your niche&#10;Min 5 posts required..."
           rows={8}
           className="w-full px-3 py-2 text-sm border focus:outline-none"
           style={{ backgroundColor: 'transparent', borderColor: '#333', color: 'var(--text)', resize: 'vertical' }}
@@ -377,21 +553,21 @@ function CustomNichePanel({ onCreated, onClose }) {
 
       <div className="flex items-center gap-3">
         <button
-          onClick={handleCreate}
-          disabled={creating}
+          onClick={handleGenerate}
+          disabled={generating}
           className="px-6 py-2 text-xs font-medium disabled:opacity-30"
           style={{
             backgroundColor: 'var(--accent)',
             color: 'var(--text)',
             border: 'none',
-            cursor: creating ? 'wait' : 'pointer',
+            cursor: generating ? 'wait' : 'pointer',
           }}
         >
-          {creating ? 'CREATING...' : 'CREATE NICHE'}
+          {generating ? 'GENERATING...' : 'GENERATE DRAFT'}
         </button>
-        {postsText.split('\n').filter(p => p.trim().length > 10).length > 0 && (
+        {samplePosts().length > 0 && (
           <span className="text-xs" style={{ color: '#555' }}>
-            {postsText.split('\n').filter(p => p.trim().length > 10).length} posts
+            {samplePosts().length} posts
           </span>
         )}
       </div>
