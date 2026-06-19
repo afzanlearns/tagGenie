@@ -1,16 +1,16 @@
 # TagGenie Evaluation Report
 
-*Generated: 2026-06-19 15:44*
+*Generated: 2026-06-19 16:52*
 
 ## Summary
 
 | Niche | Posts | TG P@5 | BL P@5 | Lift@5 | TG P@10 | BL P@10 | Lift@10 |
 |-------|-------|--------|--------|--------|---------|---------|---------|
-| b2b-saas | 5 | 80.0% | 68.0% | +17.6% | 44.0% | 62.0% | -29.0% |
-| fintech | 5 | 64.0% | 64.0% | +0.0% | 46.0% | 60.0% | -23.3% |
-| gps-telematics | 5 | 76.0% | 64.0% | +18.8% | 50.0% | 66.0% | -24.2% |
+| b2b-saas | 10 | 80.0% | 60.0% | +33.3% | 55.0% | 62.0% | -11.3% |
+| fintech | 10 | 66.0% | 54.0% | +22.2% | 45.0% | 60.0% | -25.0% |
+| gps-telematics | 10 | 80.0% | 54.0% | +48.1% | 57.0% | 63.0% | -9.5% |
 
-**Best lift:** gps-telematics at +18.8% precision@5 lift over naive baseline.
+**Best lift:** gps-telematics at +48.1% precision@5 lift over naive baseline.
 
 ## Methodology
 - **TagGenie:** Uses trend volume (Google Trends), semantic relevance (sentence-transformers), competition density (ChromaDB cosine similarity), and platform-specific weights (learned via Thompson Sampling).
