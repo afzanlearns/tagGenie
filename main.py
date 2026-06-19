@@ -208,6 +208,47 @@ async def api_beta_summary():
     return {"beta_params": get_beta_summary()}
 
 
+@app.get("/api/evaluation-summary")
+async def api_evaluation_summary():
+    """Serve the latest evaluation results from results.md."""
+    results_file = Path(__file__).parent / "evaluation" / "results.md"
+    if not results_file.exists():
+        return {"best_lift_pct": 0, "niche": "none", "results": []}
+    text = results_file.read_text()
+    # Parse the table from the markdown
+    lines = text.split("\n")
+    results = []
+    best_lift = 0
+    best_niche = ""
+    in_table = False
+    for line in lines:
+        if line.startswith("|") and "TG P@5" in line:
+            in_table = True
+            continue
+        if in_table and line.startswith("|") and "-------" not in line:
+            parts = [p.strip() for p in line.split("|")[1:-1]]
+            if len(parts) >= 8:
+                r = {
+                    "niche": parts[0],
+                    "posts": int(parts[1]) if parts[1].isdigit() else 0,
+                    "tg_p5": parts[2],
+                    "bl_p5": parts[3],
+                    "lift_p5": parts[4],
+                    "tg_p10": parts[5],
+                    "bl_p10": parts[6],
+                    "lift_p10": parts[7],
+                }
+                results.append(r)
+                try:
+                    lift_val = float(parts[4].replace("+", "").replace("%", ""))
+                    if lift_val > best_lift:
+                        best_lift = lift_val
+                        best_niche = parts[0]
+                except ValueError:
+                    pass
+    return {"best_lift_pct": best_lift, "niche": best_niche, "results": results}
+
+
 @app.post("/api/ingest-candidates")
 async def api_ingest(req: IngestRequest):
     _ingested_topics.extend([t.model_dump() for t in req.topics])

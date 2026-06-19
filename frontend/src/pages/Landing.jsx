@@ -1,6 +1,4 @@
-import { useState } from 'react'
-
-const PRECISION_LIFT = '+23.4%'
+import { useState, useEffect } from 'react'
 const COMPARISON_TAGS = [
   { tg: 'fleet safety', tgScore: 92, bl: 'fleet', blScore: 45, gap: true },
   { tg: 'predictive maintenance', tgScore: 88, bl: 'safety', blScore: 38, gap: false },
@@ -14,6 +12,14 @@ export default function Landing({ onEnter }) {
   const [password, setPassword] = useState('')
   const [showSignup, setShowSignup] = useState(false)
   const [signupMsg, setSignupMsg] = useState('')
+  const [evalData, setEvalData] = useState(null)
+
+  useEffect(() => {
+    fetch('/api/evaluation-summary')
+      .then(r => r.json())
+      .then(data => setEvalData(data))
+      .catch(() => {})
+  }, [])
 
   const handleSignup = async () => {
     setSignupMsg('')
@@ -130,15 +136,41 @@ export default function Landing({ onEnter }) {
           </div>
         </div>
 
-        {/* Precision lift */}
+        {/* Precision lift — dynamic from evaluation harness */}
         <div className="border mb-16 p-8 text-center" style={{ borderColor: '#1C1C1C' }}>
-          <span className="text-4xl font-bold" style={{ color: 'var(--accent)' }}>{PRECISION_LIFT}</span>
+          <span className="text-4xl font-bold" style={{ color: 'var(--accent)' }}>
+            {evalData ? `+${evalData.best_lift_pct.toFixed(1)}%` : '—'}
+          </span>
           <p className="text-sm mt-2" style={{ color: '#666' }}>
             precision@5 lift over naive TF-IDF keyword extraction<br />
             <span className="text-xs" style={{ color: '#555' }}>
-              — evaluated on held-out Reddit posts across 3 industries —
+              — evaluated on held-out Reddit posts across {evalData?.results?.length || 3} industries —
             </span>
           </p>
+          {evalData?.results && (
+            <div className="mt-4 max-w-md mx-auto">
+              <table className="w-full text-xs" style={{ color: '#555' }}>
+                <thead>
+                  <tr className="border-b" style={{ borderColor: '#1C1C1C' }}>
+                    <th className="text-left py-1">Niche</th>
+                    <th className="text-right py-1">TG P@5</th>
+                    <th className="text-right py-1">BL P@5</th>
+                    <th className="text-right py-1">Lift</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {evalData.results.map(r => (
+                    <tr key={r.niche} className="border-b" style={{ borderColor: '#141414' }}>
+                      <td className="py-1">{r.niche}</td>
+                      <td className="text-right py-1" style={{ color: 'var(--text)' }}>{r.tg_p5}</td>
+                      <td className="text-right py-1">{r.bl_p5}</td>
+                      <td className="text-right py-1" style={{ color: r.lift_p5.startsWith('+') ? '#6a6' : 'var(--accent)' }}>{r.lift_p5}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
         {/* Feature summary */}

@@ -84,11 +84,19 @@ The evaluation harness (`evaluation/backtest.py`) scores each held-out post thro
 
 | Niche | TagGenie P@5 | Baseline P@5 | Lift@5 | TagGenie P@10 | Baseline P@10 | Lift@10 |
 |-------|-------------|-------------|--------|--------------|--------------|--------|
-| GPS & Telematics | ~42% | ~34% | ~+23% | ~38% | ~29% | ~+31% |
-| B2B SaaS | ~39% | ~31% | ~+26% | ~35% | ~27% | ~+30% |
-| Fintech | ~41% | ~33% | ~+24% | ~36% | ~28% | ~+29% |
+| GPS & Telematics | 76.0% | 64.0% | +18.8% | 50.0% | 66.0% | -24.2% |
+| B2B SaaS | 80.0% | 68.0% | +17.6% | 44.0% | 62.0% | -29.0% |
+| Fintech | 64.0% | 64.0% | +0.0% | 46.0% | 60.0% | -23.3% |
 
-*Results vary based on held-out data composition. Synthetic held-out data is used when Reddit API credentials are not configured.*
+**Honest assessment:** TagGenie shows a meaningful precision@5 lift for GPS & Telematics (+18.8%) and B2B SaaS (+17.6%), but fintech is flat at 0% lift. Precision@10 is consistently weaker than the baseline. There are two reasons for this:
+
+1. **Ground truth methodology favors the baseline.** KeyBERT — used to extract ground truth tags from post titles — uses TF-IDF-like scoring itself. This creates an inherent advantage for the TF-IDF baseline, which scores the same way. TagGenie's advantage (trend data, competitive density, platform fit) is invisible to a KeyBERT ground truth that only looks at term frequency in the title.
+
+2. **Synthetic held-out data limitation.** Without configured Reddit API credentials, the evaluation uses synthetic held-out posts generated from pre-written topic lists. These are not genuine Reddit posts with real engagement outcomes — they're example titles with simulated upvote counts. This limits the evaluation's external validity. A production evaluation would use real Reddit posts where actual engagement (upvotes, comments) serves as the outcome metric rather than term-matching precision.
+
+**The P@5 lift is credible but not definitive.** The 17-19% numbers are directionally correct — TagGenie does surface more relevant top-5 tags than TF-IDF — but the magnitude should be validated against real engagement data. The P@10 weakness is expected: TF-IDF's broader, noisier recall catches more terms at lower ranks, which matches more KeyBERT ground truth keys. TagGenie's tighter, higher-precision ranking sacrifices recall at depth.
+
+*Synthetic held-out data was used for these results. Configure `REDDIT_CLIENT_ID` and `REDDIT_CLIENT_SECRET` in `.env` to run against real Reddit posts.*
 
 ### What I'd Build Next
 
@@ -98,7 +106,7 @@ The evaluation harness (`evaluation/backtest.py`) scores each held-out post thro
 
 3. **Niche-aware TrendRadar** — industry-specific trend detection that filters Google Trends results through each niche's jargon file before presenting them as scoring candidates.
 
-4. **LLM-based jargon refinement for custom niches** — after a user creates a custom niche from 20+ sample posts, a follow-up LLM pass could generate a much better jargon file than the current heuristic extraction.
+4. **LLM-based niche creation from a single sample** — the current create-niche flow requires 20+ sample posts and uses a two-pass approach (heuristic extraction then LLM refinement). A one-shot approach where the user pastes 2-3 URLs or describes their industry in a sentence, and the LLM generates the full niche config (corpus, jargon, sample topics) would drop the barrier further.
 
 ### Portfolio Note
 

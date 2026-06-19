@@ -92,12 +92,23 @@ def backtest_niche(
             "num_posts": 0,
         }
 
+    # Warm up the models once
+    from sentence_transformers import SentenceTransformer
+    _ = SentenceTransformer("all-MiniLM-L6-v2")
+
     tg_precisions_5 = []
     tg_precisions_10 = []
     bl_precisions_5 = []
     bl_precisions_10 = []
 
     platforms = ["LinkedIn", "Instagram", "X", "TikTok"]
+
+    product_map = {
+        "gps-telematics": "FleetTracker Pro",
+        "b2b-saas": "SaaSPlatform Enterprise",
+        "fintech": "FinPay Solutions",
+    }
+    product = product_map.get(niche_id, "TagGenie Pro")
 
     for post in held_out_data:
         title = post.get("title", "")
@@ -107,13 +118,6 @@ def backtest_niche(
         if not ground_truth:
             continue
 
-        # Use a generic product name based on the niche
-        product_map = {
-            "gps-telematics": "FleetTracker Pro",
-            "b2b-saas": "SaaSPlatform Enterprise",
-            "fintech": "FinPay Solutions",
-        }
-        product = product_map.get(niche_id, "TagGenie Pro")
         platform = random.choice(platforms)
 
         try:
@@ -139,6 +143,8 @@ def backtest_niche(
         tg_precisions_10.append(tg_p10)
         bl_precisions_5.append(bl_p5)
         bl_precisions_10.append(bl_p10)
+
+        print(f"  Post '{title[:40]}...' — TG P@5: {tg_p5:.0%}, BL P@5: {bl_p5:.0%}")
 
     avg_tg_p5 = float(np.mean(tg_precisions_5)) if tg_precisions_5 else 0.0
     avg_tg_p10 = float(np.mean(tg_precisions_10)) if tg_precisions_10 else 0.0
@@ -237,6 +243,10 @@ def main():
     results = []
     for niche_id in niches:
         print(f"\nEvaluating niche: {niche_id}")
+        # Seed the corpus for this niche
+        from backend.embeddings import seed_corpus
+        seed_corpus(niche_id)
+
         result = backtest_niche(niche_id, args.posts)
         print(f"  Posts scored: {result.get('num_posts', 0)}")
         print(f"  TagGenie P@5: {result.get('precision_at_5', 0):.1%}")
