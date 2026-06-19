@@ -13,8 +13,8 @@ from backend.models import (
 )
 from backend.niche_generator import generate_niche_draft
 from backend.niche_manager import save_niche_draft
-from backend.scoring import score_topic, load_weights
-from backend.baseline import score_baseline
+from backend.scoring import score_topic, load_weights, _get_sim_model
+from backend.baseline import score_baseline, _get_nlp as _get_baseline_nlp
 from backend.cache import cache_key, get as cache_get, set as cache_set
 from backend.feedback import init_db, seed_synthetic_feedback, log_feedback, get_feedback_by_niche
 from backend.scheduler import start_scheduler, shutdown_scheduler, trigger_recompute, get_beta_summary
@@ -26,6 +26,8 @@ from backend.auth import (
     init_auth_db, signup, authenticate, create_access_token,
     verify_token, log_usage, get_usage, get_user_by_api_key,
 )
+from backend.embeddings import _get_embedder
+from backend.extraction import _get_nlp as _get_extraction_nlp, _get_ke
 
 _ingested_topics = []
 
@@ -40,6 +42,14 @@ async def lifespan(app: FastAPI):
     seed_synthetic_feedback()
     load_weights()
     start_scheduler()
+
+    # Pre-load ML models so first request doesn't pay cold-start cost
+    _get_embedder()         # sentence-transformers for embeddings/ChromaDB
+    _get_sim_model()        # sentence-transformers for semantic relevance
+    _get_extraction_nlp()   # spaCy pipeline for candidate extraction
+    _get_baseline_nlp()     # spaCy pipeline for TF-IDF baseline
+    _get_ke()               # KeyBERT for keyword extraction
+
     yield
     shutdown_scheduler()
 
