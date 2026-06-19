@@ -79,6 +79,22 @@ class CreateNicheRequest(BaseModel):
     sample_posts: list[str]
 
 
+class GenerateDraftRequest(BaseModel):
+    niche_id: str
+    display_name: str
+    sample_posts: list[str]
+
+
+class SaveNicheDraftRequest(BaseModel):
+    niche_id: str
+    display_name: str
+    description: str
+    sample_posts: list[str]
+    corpus: list[str]
+    jargon: dict
+    sample_topics: list[str]
+
+
 class SignupRequest(BaseModel):
     email: str
     password: str

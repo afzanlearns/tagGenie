@@ -80,3 +80,58 @@ def generate_rationale(
             return f"Reach of {reach_score:.0f} but high competition ({competition_score:.0f}) — a crowded space in this niche."
         else:
             return f"Balanced reach ({reach_score:.0f}) and competition ({competition_score:.0f}) yielding final score of {final_score:.0f}."
+
+
+def batch_generate_rationales(
+    tags: list[dict], niche_id: str = None
+) -> list[str]:
+    """Generate rationales for multiple tags in a single LLM call.
+
+    Each dict in `tags` should have keys: tag, reach_score, competition_score, final_score.
+    Returns a list of rationale strings in the same order.
+    """
+    if niche_id is None:
+        niche_id = get_active_niche()
+
+    tag_block = "\n".join(
+        f"  {i+1}. tag='{t['tag']}' reach={t['reach_score']:.1f} comp={t['competition_score']:.1f} final={t['final_score']:.1f}"
+        for i, t in enumerate(tags)
+    )
+
+    client = _get_client()
+    prompt = (
+        f"Given the following {len(tags)} scored tags in the '{niche_id}' industry, "
+        f"generate a ONE-SENTENCE rationale for EACH tag explaining why it ranks where it does. "
+        f"Numbers: reach=reach/trend score, comp=competition/saturation, final=composite.\n\n"
+        f"Rules:\n"
+        f"- If reach is high and comp low (blue ocean), say it's an underused opportunity.\n"
+        f"- If comp is high, say the space is crowded.\n"
+        f"- Ground each rationale in the actual numbers provided.\n"
+        f"- Keep each rationale to one sentence.\n"
+        f"- Do not add disclaimers like 'based on the numbers'.\n\n"
+        f"Tags:\n{tag_block}\n\n"
+        f"Return ONLY a numbered list:\n1. [rationale for tag 1]\n2. [rationale for tag 2]\n..."
+    )
+    try:
+        resp = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.5,
+            max_tokens=800,
+            timeout=15.0,
+        )
+        raw = resp.choices[0].message.content.strip()
+        lines = [l.strip() for l in raw.split("\n") if l.strip()]
+        results = []
+        for l in lines:
+            l = l.lstrip("0123456789. )-")
+            if l:
+                results.append(l)
+        if len(results) >= len(tags):
+            return results[:len(tags)]
+        return results + [generate_rationale(t["tag"], t["reach_score"], t["competition_score"], t["final_score"], niche_id) for t in tags[len(results):]]
+    except Exception:
+        return [
+            f"Reach: {t['reach_score']:.0f}, Competition: {t['competition_score']:.0f}"
+            for t in tags
+        ]

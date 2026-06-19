@@ -116,12 +116,14 @@ def score_topic(topic: str, product: str, platform: str, niche_id: str = None) -
     top_confidence = compute_confidence(global_fallback, niche_id)
 
     top_10 = ranked[:10]
-    for item in top_10:
-        item["rationale"] = llm.generate_rationale(
-            item["tag"], item["reach_score"],
-            item["competition_score"], item["final_score"],
-            niche_id
-        )
+    batch_input = [
+        {"tag": item["tag"], "reach_score": item["reach_score"],
+         "competition_score": item["competition_score"], "final_score": item["final_score"]}
+        for item in top_10
+    ]
+    rationales = llm.batch_generate_rationales(batch_input, niche_id)
+    for i, item in enumerate(top_10):
+        item["rationale"] = rationales[i] if i < len(rationales) else ""
 
     ranked_tags = [
         CandidateTag(**item) for item in ranked[:10]

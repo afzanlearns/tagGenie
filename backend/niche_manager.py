@@ -97,6 +97,45 @@ def build_jargon_context(niche_id: str) -> str:
     return "\n".join(parts)
 
 
+def save_niche_draft(
+    niche_id: str,
+    display_name: str,
+    description: str,
+    sample_posts: list[str],
+    corpus: list[str],
+    jargon: dict,
+    sample_topics: list[str],
+) -> dict:
+    """Save a user-reviewed niche draft to disk.
+    
+    This is the second step of the two-step creation flow:
+    1. generate_niche_draft() — LLM produces draft config
+    2. User reviews/edits in UI
+    3. save_niche_draft() — writes final files to disk
+    """
+    niche_dir = NICHES_DIR / niche_id
+    niche_dir.mkdir(parents=True, exist_ok=True)
+
+    config = {
+        "niche_id": niche_id,
+        "display_name": display_name,
+        "description": description,
+        "default_platforms": ["LinkedIn", "Instagram", "X", "TikTok"],
+        "sample_topics": sample_topics[:5],
+        "created_at": "2026-06-19T00:00:00Z",
+    }
+    with open(niche_dir / "config.json", "w") as f:
+        json.dump(config, f, indent=2)
+
+    with open(niche_dir / "seed_corpus.json", "w") as f:
+        json.dump(corpus[:100], f, indent=2)
+
+    with open(niche_dir / "jargon_expansion.json", "w") as f:
+        json.dump(jargon, f, indent=2)
+
+    return config
+
+
 def create_custom_niche(
     niche_id: str,
     display_name: str,

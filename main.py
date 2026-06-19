@@ -3,12 +3,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from contextlib import asynccontextmanager
+from pathlib import Path
 import time
 
 from backend.models import (
     ScoreRequest, ScoreResponse, FeedbackRequest, IngestRequest,
-    CreateNicheRequest, SignupRequest, LoginRequest, AuthResponse,
+    CreateNicheRequest, GenerateDraftRequest, SaveNicheDraftRequest,
+    SignupRequest, LoginRequest, AuthResponse,
 )
+from backend.niche_generator import generate_niche_draft
+from backend.niche_manager import save_niche_draft
 from backend.scoring import score_topic, load_weights
 from backend.baseline import score_baseline
 from backend.cache import cache_key, get as cache_get, set as cache_set
@@ -179,6 +183,55 @@ async def api_create_niche(req: CreateNicheRequest):
 
     config = create_custom_niche(
         req.niche_id, req.display_name, req.description, req.sample_posts
+    )
+    return {"status": "created", "niche": config}
+
+
+@app.post("/api/niches/generate-draft")
+async def api_generate_draft(req: GenerateDraftRequest):
+    if len(req.sample_posts) < 5:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Need at least 5 sample posts, got {len(req.sample_posts)}",
+        )
+    if get_niche_config(req.niche_id) is not None:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Niche '{req.niche_id}' already exists",
+        )
+
+    draft = generate_niche_draft(req.niche_id, req.display_name, req.sample_posts)
+    return {
+        "status": "draft_generated",
+        "draft": {
+            "niche_id": req.niche_id,
+            "display_name": req.display_name,
+            "description": draft.get("description", f"Auto-generated niche for {req.display_name}"),
+            "sample_topics": draft.get("sample_topics", []),
+            "corpus": draft.get("corpus", []),
+            "jargon": draft.get("jargon", {}),
+            "sample_posts": req.sample_posts,
+            "_fallback": draft.get("_fallback"),
+        },
+    }
+
+
+@app.post("/api/niches/save-draft")
+async def api_save_draft(req: SaveNicheDraftRequest):
+    if get_niche_config(req.niche_id) is not None:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Niche '{req.niche_id}' already exists",
+        )
+
+    config = save_niche_draft(
+        niche_id=req.niche_id,
+        display_name=req.display_name,
+        description=req.description,
+        sample_posts=req.sample_posts,
+        corpus=req.corpus,
+        jargon=req.jargon,
+        sample_topics=req.sample_topics,
     )
     return {"status": "created", "niche": config}
 
