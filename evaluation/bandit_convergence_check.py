@@ -14,9 +14,9 @@ import math
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from backend.scheduler import _thompson_recompute, get_beta_summary, _load_beta_params
+from backend.scheduler import _thompson_recompute, get_beta_summary, _load_beta_params, _save_beta_params, BETA_FILE
 from backend.feedback import log_feedback, init_db, seed_synthetic_feedback
-from backend.scoring import PLATFORM_WEIGHTS
+from backend.scoring import PLATFORM_WEIGHTS, load_weights, save_weights
 
 
 def beta_variance(alpha, beta):
@@ -28,6 +28,12 @@ def beta_variance(alpha, beta):
 
 def main():
     init_db()
+
+    # Reset to fresh state for clean convergence test (save originals first)
+    if BETA_FILE.exists():
+        BETA_FILE.rename(BETA_FILE.with_suffix(".json.bak"))
+    save_weights()
+    load_weights()
 
     print("=" * 80)
     print("BANDIT CONVERGENCE SANITY CHECK")
@@ -45,7 +51,10 @@ def main():
             for platform in platforms:
                 for i in range(3):
                     post_id = f"conv_check_{round_num}_{niche}_{platform}_{i}"
-                    tags = [f"tag_{j}" for j in range(5)]
+                    tags = (
+                        [f"t{j}" for j in range(2)]
+                        + [f"multi word keyword phrase variant {j}" for j in range(3)]
+                    )
                     likes = int(abs(hash(f"{post_id}_likes")) % 300 + 10)
                     shares = int(abs(hash(f"{post_id}_shares")) % 80)
                     comments = int(abs(hash(f"{post_id}_comments")) % 50)
@@ -134,6 +143,13 @@ def main():
     else:
         print(f"  WARNING: Only {positive_delta_count}/{total_keys} distributions shifted positively")
     print("=" * 80)
+
+    # Restore original state
+    bak = BETA_FILE.with_suffix(".json.bak")
+    if bak.exists():
+        BETA_FILE.unlink(missing_ok=True)
+        bak.rename(BETA_FILE)
+    load_weights()
 
 
 if __name__ == "__main__":
