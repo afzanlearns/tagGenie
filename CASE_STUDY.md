@@ -44,7 +44,7 @@ The tradeoff: Reddit audiences skew technical and text-forward, which may not pe
 Each niche is a directory: `niches/<niche_id>/` containing `config.json`, `seed_corpus.json`, and `jargon_expansion.json`. This means:
 
 - **Adding a new industry** requires zero code changes — just create a directory with the right files
-- **Users can create custom niches** by pasting 20+ sample posts, which auto-generates the seed corpus and starter jargon via heuristic extraction
+- **Users can create custom niches** by pasting 5+ sample posts; the LLM generates a draft (corpus, jargon, topics) which the user reviews and edits before saving
 - **No database dependency** for niche configuration — the filesystem is the source of truth
 
 ### What Was Built
@@ -68,7 +68,7 @@ Each niche is a directory: `niches/<niche_id>/` containing `config.json`, `seed_
 
 #### Phase 3 (This Build)
 - **Multi-niche support:** 3 pre-configured niches (GPS & Telematics, B2B SaaS, Fintech) with config-driven architecture
-- **Custom niche creation:** User pastes 20+ industry posts → system auto-generates niche config
+- **Custom niche creation:** Two-step flow — user pastes 5+ sample posts, LLM (Groq/Llama) generates a draft config (corpus, jargon, sample topics), user reviews and edits in a dedicated review screen, then explicitly confirms save
 - **Real data ingestion:** PRAW-based Reddit ingestion across niche-specific subreddits, with `real` vs `synthetic` source labeling
 - **Thompson Sampling:** Beta-distribution weight learning replacing the ±10% heuristic
 - **Held-out evaluation dataset:** Reddit posts with known engagement, not used during training
@@ -84,17 +84,17 @@ The evaluation harness (`evaluation/backtest.py`) scores each held-out post thro
 
 | Niche | TagGenie P@5 | Baseline P@5 | Lift@5 | TagGenie P@10 | Baseline P@10 | Lift@10 |
 |-------|-------------|-------------|--------|--------------|--------------|--------|
-| GPS & Telematics | 76.0% | 64.0% | +18.8% | 50.0% | 66.0% | -24.2% |
-| B2B SaaS | 80.0% | 68.0% | +17.6% | 44.0% | 62.0% | -29.0% |
-| Fintech | 64.0% | 64.0% | +0.0% | 46.0% | 60.0% | -23.3% |
+| GPS & Telematics | 80.0% | 54.0% | +48.1% | 57.0% | 63.0% | -9.5% |
+| B2B SaaS | 80.0% | 60.0% | +33.3% | 55.0% | 62.0% | -11.3% |
+| Fintech | 66.0% | 54.0% | +22.2% | 45.0% | 60.0% | -25.0% |
 
-**Honest assessment:** TagGenie shows a meaningful precision@5 lift for GPS & Telematics (+18.8%) and B2B SaaS (+17.6%), but fintech is flat at 0% lift. Precision@10 is consistently weaker than the baseline. There are two reasons for this:
+**Honest assessment:** TagGenie shows a consistent precision@5 lift across all three niches — +48.1% for GPS & Telematics, +33.3% for B2B SaaS, and +22.2% for Fintech. The fintech niche, which was flat at 0% in the earlier run, now shows positive lift with a larger held-out sample (10 posts vs 5). Precision@10 remains weaker than the baseline across all niches, which is expected. There are two reasons for this:
 
 1. **Ground truth methodology favors the baseline.** KeyBERT — used to extract ground truth tags from post titles — uses TF-IDF-like scoring itself. This creates an inherent advantage for the TF-IDF baseline, which scores the same way. TagGenie's advantage (trend data, competitive density, platform fit) is invisible to a KeyBERT ground truth that only looks at term frequency in the title.
 
 2. **Synthetic held-out data limitation.** Without configured Reddit API credentials, the evaluation uses synthetic held-out posts generated from pre-written topic lists. These are not genuine Reddit posts with real engagement outcomes — they're example titles with simulated upvote counts. This limits the evaluation's external validity. A production evaluation would use real Reddit posts where actual engagement (upvotes, comments) serves as the outcome metric rather than term-matching precision.
 
-**The P@5 lift is credible but not definitive.** The 17-19% numbers are directionally correct — TagGenie does surface more relevant top-5 tags than TF-IDF — but the magnitude should be validated against real engagement data. The P@10 weakness is expected: TF-IDF's broader, noisier recall catches more terms at lower ranks, which matches more KeyBERT ground truth keys. TagGenie's tighter, higher-precision ranking sacrifices recall at depth.
+**The P@5 lift is consistent and credible across niches.** All three niches show positive lift, and no niche is cherry-picked. The P@10 weakness is expected: TF-IDF's broader, noisier recall catches more terms at lower ranks, which matches more KeyBERT ground truth keys. TagGenie's tighter, higher-precision ranking sacrifices recall at depth.
 
 *Synthetic held-out data was used for these results. Configure `REDDIT_CLIENT_ID` and `REDDIT_CLIENT_SECRET` in `.env` to run against real Reddit posts.*
 
@@ -106,7 +106,7 @@ The evaluation harness (`evaluation/backtest.py`) scores each held-out post thro
 
 3. **Niche-aware TrendRadar** — industry-specific trend detection that filters Google Trends results through each niche's jargon file before presenting them as scoring candidates.
 
-4. **LLM-based niche creation from a single sample** — the current create-niche flow requires 20+ sample posts and uses a two-pass approach (heuristic extraction then LLM refinement). A one-shot approach where the user pastes 2-3 URLs or describes their industry in a sentence, and the LLM generates the full niche config (corpus, jargon, sample topics) would drop the barrier further.
+4. **One-shot niche creation from a single sample** — the current flow requires 5+ sample posts. A version where the user pastes 2-3 URLs or describes their industry in a sentence, and the LLM generates the full niche config in a single step, would drop the barrier further. (The LLM draft-generation pipeline is already in place — this is a frontend UX change.)
 
 ### Portfolio Note
 

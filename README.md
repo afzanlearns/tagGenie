@@ -1,237 +1,146 @@
-# TagGenie — Distribution Intelligence Engine
+# TagGenie
 
-The Hashtag & Keyword Mining Agent for the Vignan/AjnaView 19-agent intern project set. An autonomous scoring agent that explains its decisions, finds competitive gaps, and learns from feedback over time.
+**Distribution intelligence for content tagging.** TagGenie scores hashtags and keywords on real reach and competition signals, explains its own reasoning, and learns from outcomes over time — instead of guessing.
 
-## Why This Beats a Static Hashtag List
+---
 
-Static hashtag lists are dead on arrival — they don't know the current competitive density of a term, can't tell you which tags are underused blue-ocean opportunities, and never improve with real outcome data.
+## Overview
 
-TagGenie scores every candidate tag against three axes simultaneously:
+Most hashtag and keyword tools work off frequency counts: pull the most common terms for a topic and call it a recommendation. TagGenie takes a different approach. For any topic and platform, it estimates real-world reach using search trend data, measures how saturated a term already is by comparing it against a corpus of existing posts in the same industry, and weights everything according to platform-specific behavior — a hashtag-heavy strategy that works on Instagram actively hurts performance on LinkedIn, and TagGenie's scoring reflects that asymmetry rather than treating every platform the same.
 
-- **Reach** (trend volume + semantic relevance to your topic)
-- **Competition** (embedding similarity density against a real fleet-tech post corpus — high score = crowded, avoid)
-- **Confidence** (are we on real Google Trends data, or fallback? Is our corpus representative?)
+Beyond ranking, TagGenie surfaces a dedicated **gap list**: terms with strong reach and low competition, the recommendations most likely to be worth acting on. Every top-ranked tag comes with a short, numbers-grounded explanation of why it scored the way it did, so the system's reasoning is visible rather than a black box.
 
-A nightly feedback loop quietly ingests post performance (likes, shares, comments), compares actual engagement against predictions, and adjusts the platform weight matrix by ±10% — clamped to [0.1, 2.0]. The weights persist to `weights.json` and take effect on the next `/api/score` call without any manual intervention.
+TagGenie is also built to plug into a larger content pipeline rather than operate in isolation. It can ingest trending topics from an upstream discovery agent and feed its ranked output downstream to a content generation or publishing system, acting as the distribution-intelligence layer between topic discovery and content delivery.
 
-The **Gap Finder** — "Blue Ocean" tags where reach > 60 and competition < 30 — is surfaced as a first-class citizen in both the API response and the UI. This is the single most actionable output.
+---
 
-If pytrends rate-limits, the engine falls back to a static dataset and flags `fallback_mode: true`, which docks confidence by 30 points. Uncertainty is never hidden.
+## How It Works
 
-## Tech Stack
+**Extraction.** Candidate keywords and hashtags are generated using KeyBERT and spaCy, working against a topic that's first expanded by an LLM to surface industry-specific terminology a generic extractor would miss.
+
+**Reach scoring.** Each candidate is scored against real Google Trends interest data, normalized and blended with semantic relevance to the original topic. If trend data is unavailable, the system falls back to a static reference dataset and flags the response accordingly, so reduced confidence is always visible rather than silent.
+
+**Competition scoring.** Candidates are embedded and compared against a seed corpus of real posts from the relevant industry using vector similarity search. Higher similarity density means a term is already saturated; lower density signals room to stand out.
+
+**Platform weighting.** A weight matrix adjusts each candidate's score based on platform and type (hashtag vs. keyword), reflecting how differently LinkedIn, Instagram, X, and TikTok reward each format.
+
+**Composite ranking.** Reach, inverse competition, and confidence are combined into a single ranking formula, scaled by the platform weight, to produce the final ordered recommendation list.
+
+**Gap finding.** Candidates with high reach and low competition are pulled out into a separate, prioritized "blue ocean" list — the system's highest-confidence recommendations.
+
+**Explainability.** The top-ranked candidates each receive a one-line, LLM-generated rationale grounded strictly in their computed scores, not invented claims.
+
+---
+
+## Adaptive Learning
+
+TagGenie logs how posts using its recommended tags actually perform — both real engagement data pulled from public sources and clearly-labeled synthetic data for testing — and uses that feedback to improve over time. Rather than a fixed adjustment rule, platform and tag-type weights are modeled as Beta distributions and updated nightly using Thompson Sampling, giving the system a principled way to balance exploring uncertain recommendations against exploiting ones it's already confident about. The result is a scoring system that gets sharper the more it's used, rather than one that's static from day one.
+
+---
+
+## Multi-Industry Support
+
+TagGenie isn't tied to a single vertical. It ships with pre-configured niches — each with its own seed corpus, industry jargon mapping, and isolated vector collection — and supports creating new niches from scratch: paste a sample of posts from any industry, and the system generates a starter corpus and jargon list for review before saving. This makes TagGenie a configurable platform rather than a single-purpose script, usable anywhere distribution intelligence matters, not just the industry it was first built for.
+
+---
+
+## Proof of Value
+
+TagGenie includes an honest, side-by-side comparison against a standard TF-IDF keyword baseline — not a deliberately weakened strawman — so the value of its scoring approach is visible directly in the interface rather than asserted. It also includes a formal evaluation harness that backtests ranking quality against held-out historical data, computing precision at top-5 and top-10 against the same baseline. Current results are documented in `evaluation/results.md`.
+
+---
+
+## Architecture & Tech Stack
 
 | Layer | Technology |
-|-------|-----------|
-| Backend | Python 3.11+, FastAPI (async) |
-| Keyword Extraction | KeyBERT + spaCy (`en_core_web_sm`) |
-| Embeddings | sentence-transformers (`all-MiniLM-L6-v2`) |
-| Vector Store | ChromaDB (cosine space, persistent) |
-| LLM | Groq API, Llama 3.3 70B — rationale text only, never scoring math |
-| Trends | pytrends (unofficial Google Trends) with static fallback |
-| Storage | SQLite (`feedback.db`) |
-| Scheduler | APScheduler, nightly weight recompute |
-| Frontend | React 18 + Vite + Tailwind (utility classes only), Geist Mono |
-
-## Project Structure
+|---|---|
+| API | Python, FastAPI |
+| Extraction | KeyBERT, spaCy |
+| Embeddings & vector search | sentence-transformers, ChromaDB |
+| Reasoning & explainability | Groq (Llama 3.3 70B) |
+| Trend signal | Google Trends (pytrends), with static fallback |
+| Real engagement data | Reddit API (PRAW) |
+| Adaptive weighting | Thompson Sampling (Beta-distribution bandit) |
+| Persistence | SQLite |
+| Scheduling | APScheduler |
+| Auth | JWT, per-user API keys |
+| Frontend | React 18, Vite, Tailwind |
 
 ```
 taggenie/
-  backend/
-    __init__.py
-    extraction.py      # KeyBERT keyword extraction + spaCy noun chunks
-    scoring.py         # Composite ranking, gap finder, platform weights
-    baseline.py        # Naive TF-IDF baseline for comparison mode
-    embeddings.py      # Sentence transformer + ChromaDB embed/query
-    llm.py             # Groq semantic expansion + rationale generation
-    trends.py          # pytrends Google Trends + static fallback
-    feedback.py        # SQLite post feedback logging + analysis
-    scheduler.py       # APScheduler nightly weight recompute job
-    cache.py           # In-memory response cache (10-min TTL)
-    models.py          # Pydantic request/response schemas
-    requirements.txt
-    .env               # GROQ_API_KEY=your_key_here
-  frontend/
-    src/
-      App.jsx
-      main.jsx
-      components/
-        InputPanel.jsx
-        ResultsTable.jsx
-        ScoreBar.jsx
-        RationalePanel.jsx
-        GapFinder.jsx
-        FeedbackSimulator.jsx
-        ComparisonView.jsx    # Side-by-side TagGenie vs baseline
-        DemoMode.jsx          # Guided auto-run demo with 3 pre-loaded topics
-      styles/tokens.css
-  mocks/
-    mock_trendradar_payload.json   # Realistic TrendRadar fixture
-    mock_omnipost_consumer.py      # OmniPost publish payload formatter
-  tests/
-    test_scoring.py     # Composite formula, weight clamping, gap thresholds
-    test_api.py         # All 5 endpoints, valid + invalid payloads
-  data/
-    sample_topics.json  # Static fallback trend data
-    seed_corpus.json    # 60 fleet-tech social posts for ChromaDB
-    weights.json        # Persisted platform weight matrix
-    feedback.db         # Created at runtime
-  main.py              # FastAPI entry point
-  demo_pipeline.py     # TrendRadar → TagGenie → OmniPost integration demo
-  validate_cli.py      # Phase 2 CLI validation against 5 test topics
-  test_api.py          # Integration test for all endpoints
-  test_feedback.py     # Feedback loop weight adjustment test
+├── backend/
+│   ├── extraction.py        # candidate generation
+│   ├── embeddings.py        # vector search & competition scoring
+│   ├── trends.py             # reach scoring
+│   ├── scoring.py            # composite ranking & gap finder
+│   ├── baseline.py           # TF-IDF comparison engine
+│   ├── llm.py                 # expansion & rationale generation
+│   ├── feedback.py           # engagement logging
+│   ├── reddit_ingest.py      # real engagement data collection
+│   ├── scheduler.py          # nightly bandit weight recompute
+│   ├── auth.py                # JWT auth & multi-tenancy
+│   ├── cache.py               # response caching
+│   └── models.py             # request/response schemas
+├── niches/                   # per-industry config: corpus, jargon, settings
+├── evaluation/                # backtesting harness & results
+├── mocks/                     # upstream/downstream integration fixtures
+├── frontend/
+│   └── src/components/        # dashboard, comparison view, demo mode
+├── tests/
+├── demo_pipeline.py            # end-to-end cross-agent integration demo
+├── CASE_STUDY.md
+└── README.md
 ```
 
-## Setup
+---
 
+## Getting Started
+
+**Backend**
 ```bash
-# 1. Install Python dependencies
-pip install -r backend/requirements.txt
-python -m spacy download en_core_web_sm
-
-# 2. Install frontend dependencies
-cd frontend && npm install
-
-# 3. Set Groq API key (optional — engine works without it, falls back gracefully)
-echo "GROQ_API_KEY=gsk_your_api_key_here" > backend/.env
-
-# 4. Seed ChromaDB with fleet-tech corpus + synthetic feedback data
-python -c "from backend.embeddings import seed_corpus; print(f'Seeded {seed_corpus()} docs')"
-python -c "from backend.feedback import init_db, seed_synthetic_feedback; init_db(); seed_synthetic_feedback(); print('Feedback DB ready')"
-```
-
-## Running
-
-**Backend only:**
-```bash
+python3 -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+# configure .env with GROQ_API_KEY, REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET,
+# REDDIT_USER_AGENT, and JWT_SECRET
 uvicorn main:app --reload --port 8000
 ```
 
-**Full stack (terminal 1 + terminal 2):**
+**Frontend**
 ```bash
-# Terminal 1: Backend
-uvicorn main:app --reload --port 8000
-
-# Terminal 2: Frontend dev server
-cd frontend && npm run dev
+cd frontend
+npm install
+npm run dev
 ```
 
-Frontend proxies `/api/*` to `localhost:8000`. Open `http://localhost:5173`.
+---
 
-## API Endpoints
+## API
 
-### POST /api/score
-```json
-// Request
-{ "topic": "AI dashcams for fleet safety", "product": "Vignan Dashcam AI", "platform": "LinkedIn" }
+| Endpoint | Purpose |
+|---|---|
+| `POST /api/score` | Score and rank tags for a topic, platform, and niche |
+| `POST /api/feedback` | Log real or simulated post engagement |
+| `POST /api/ingest-candidates` | Accept trending topics from an upstream discovery agent |
+| `POST /api/trigger-recompute` | Manually trigger the adaptive weight recompute job |
+| `POST /api/auth/signup`, `/login` | Account creation and authentication |
+| `GET /health` | Service health check |
 
-// Response
-{
-  "topic": "AI dashcams for fleet safety",
-  "platform": "LinkedIn",
-  "ranked_tags": [
-    {
-      "tag": "fleet safety vignan",
-      "type": "keyword",
-      "reach_score": 65.9,
-      "competition_score": 37.9,
-      "final_score": 65.6,
-      "confidence": 70.0,
-      "rationale": "High reach (66) with low saturation (38)..."
-    }
-  ],
-  "gap_tags": [...],
-  "confidence": 70.0,
-  "fallback_mode": true
-}
-```
+Full request/response schemas are defined in `backend/models.py`.
 
-### POST /api/feedback
-```json
-{ "post_id": "post_001", "platform": "LinkedIn", "tags_used": ["fleet safety"], "engagement": { "likes": 120, "shares": 15, "comments": 8 } }
-```
+---
 
-### POST /api/ingest-candidates
-```json
-{ "topics": [{ "topic": "autonomous truck platooning", "momentum_score": 87.5 }] }
-```
+## Testing
 
-### POST /api/trigger-recompute
-Manually triggers the nightly weight adjustment job for testing.
-
-## CLI Validation
+The project includes a full automated test suite covering scoring logic, API contract validation, and authentication/data isolation:
 
 ```bash
-python validate_cli.py
+pytest tests/ -v
 ```
 
-Scores 5 fleet-tech topics across different platforms and prints ranked output with rationales and gap analysis.
+An end-to-end integration script (`demo_pipeline.py`) validates the full upstream-to-downstream pipeline using realistic mock payloads, and a guided in-app demo mode walks through the scoring, gap-finding, explainability, and feedback-adjustment flow on pre-selected topics for live presentation.
 
-## 60-Second Demo Script
-
-Exact sequence of clicks and narration beats — anyone can run this cold.
-
-### Setup (before demo)
-```bash
-# Terminal 1: Backend
-uvicorn main:app --port 8000
-
-# Terminal 2: Frontend
-cd frontend && npm run dev
-```
-Open `http://localhost:5173` in a browser. Confirm "DEMO MODE" button is visible in header.
-
-### The Demo (0:00 → 1:00)
-
-| Time | Click | Narration |
-|------|-------|-----------|
-| 0:00 | Click **DEMO MODE** button | "TagGenie is an autonomous scoring agent — one of 19 agents in the Vignan/AjnaView intern set. It doesn't just suggest hashtags — it scores them against real competitive data, explains WHY, finds gaps nobody else is using, and learns from post performance automatically." |
-| 0:05 | Click the first demo topic card: **"AI dashcams for fleet safety"** | "I've pre-loaded three fleet-tech topics. Watch what happens when I select one — the pipeline auto-runs every stage." |
-| 0:10 | (Pipeline auto-advances — watch the stage list fill in) | "Seven stages fire in sequence: topic expansion through Groq LLM... scoring against trend volume, semantic relevance, and competition density... baseline comparison against plain TF-IDF... gap finding for under-served terms... rationale generation per tag... simulated feedback posting... and the weight shift that learns from it all." |
-| 0:40 | When pipeline completes, switch to **COMPARISON** tab | "Here's the killer feature — side by side with a naive TF-IDF baseline. Same topic, same input. TagGenie finds fleet-specific compound terms the baseline can't see, and flags blue-ocean gaps with the diamond marker. The baseline has no competitive awareness, no trend data, no learning loop." |
-| 0:50 | Switch to **BLUE OCEAN** tab | "These are the tags with high reach and low saturation — first-mover advantage opportunities the baseline completely misses." |
-| 0:55 | Switch to **FEEDBACK SIM** tab, click **SIMULATE POST** | "And this closes the loop — every simulated post feeds the nightly weight recompute. The engine gets smarter every time someone posts with these tags." |
-
-### Post-demo (if time allows)
-```bash
-# Prove the cross-agent integration story
-python demo_pipeline.py
-```
-Shows `[STAGE]`-labeled output: TrendRadar ingest → TagGenie scoring → OmniPost publish payload.
-
-### Cross-Agent Integration Pipeline
-```bash
-python demo_pipeline.py
-```
-Loads `mocks/mock_trendradar_payload.json` (simulating TrendRadar input), POSTs each topic to `/api/score`, and formats publish-ready payloads shaped for OmniPost consumption. Printed with clear `[STAGE]` labels for live narration.
+---
 
 ## Design
 
-- Canvas: #0C0C0C, Text: #F0EDE6, Accent: #D42B2B (primary actions + critical scores only)
-- Border radius: 0px everywhere. No gradients. No box-shadows. No rounded corners.
-- Font: Geist Mono, monospace alignment for all data tables
-- Reference aesthetic: Linear, Vercel Dashboard
-
-## Scoring Formulas
-
-```
-reach_score = (trend_volume * 0.6) + (semantic_relevance_to_topic * 0.4)
-composite = (reach_score * 0.5) + ((100 - competition_score) * 0.3) + (confidence * 0.2)
-final_score = composite * platform_weight_for_type
-confidence = 100 - (fallback_mode ? 30 : 0) - (corpus < 20 ? 10 : 0)
-```
-
-Platform weight matrix (hardcoded, adjusted by feedback loop):
-
-| Platform   | hashtag_weight | keyword_weight |
-|------------|----------------|----------------|
-| LinkedIn   | 0.3            | 1.0            |
-| Instagram  | 1.0            | 0.4            |
-| X          | 0.7            | 0.6            |
-| TikTok     | 0.9            | 0.5            |
-
-## What This Doesn't Do
-
-- Doesn't use the LLM for scoring math — Groq writes rationale text only
-- Doesn't fabricate engagement numbers as real — synthetic feedback is labeled "SIMULATED" in the UI
-- Doesn't use card-shadow UI patterns, gradients, rounded corners, or Inter font
+The interface follows a deliberate brutalist-minimal system: near-black canvas, high-contrast cream text, a single red accent reserved for primary actions and critical signals, zero border-radius, and Geist Mono throughout. No gradients, no shadows, no decorative animation — the aesthetic prioritizes legibility and confidence in the data over visual noise.
