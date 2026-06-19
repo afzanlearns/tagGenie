@@ -22,7 +22,9 @@ def init_db():
             likes INTEGER DEFAULT 0,
             shares INTEGER DEFAULT 0,
             comments INTEGER DEFAULT 0,
-            posted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            posted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            niche TEXT DEFAULT 'gps-telematics',
+            source TEXT DEFAULT 'synthetic'
         )
     """)
     conn.commit()
@@ -30,22 +32,32 @@ def init_db():
 
 
 def log_feedback(post_id: str, platform: str, tags_used: list[str],
-                 likes: int, shares: int, comments: int):
+                 likes: int, shares: int, comments: int,
+                 niche: str = "gps-telematics", source: str = "synthetic"):
     conn = _get_conn()
     conn.execute(
-        "INSERT OR REPLACE INTO post_feedback (post_id, platform, tags_used, likes, shares, comments, posted_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (post_id, platform, json.dumps(tags_used), likes, shares, comments, datetime.utcnow().isoformat()),
+        """INSERT OR REPLACE INTO post_feedback 
+           (post_id, platform, tags_used, likes, shares, comments, posted_at, niche, source) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (post_id, platform, json.dumps(tags_used), likes, shares, comments,
+         datetime.utcnow().isoformat(), niche, source),
     )
     conn.commit()
     conn.close()
 
 
-def get_platform_stats(platform: str) -> dict:
+def get_platform_stats(platform: str, niche: str = None) -> dict:
     conn = _get_conn()
-    rows = conn.execute(
-        "SELECT tags_used, likes, shares, comments FROM post_feedback WHERE platform = ?",
-        (platform,),
-    ).fetchall()
+    if niche:
+        rows = conn.execute(
+            "SELECT tags_used, likes, shares, comments FROM post_feedback WHERE platform = ? AND niche = ?",
+            (platform, niche),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT tags_used, likes, shares, comments FROM post_feedback WHERE platform = ?",
+            (platform,),
+        ).fetchall()
     conn.close()
 
     tag_engagement = {}
@@ -74,7 +86,7 @@ def get_platform_stats(platform: str) -> dict:
 
 def seed_synthetic_feedback():
     conn = _get_conn()
-    count = conn.execute("SELECT COUNT(*) FROM post_feedback").fetchone()[0]
+    count = conn.execute("SELECT COUNT(*) FROM post_feedback WHERE source = 'synthetic'").fetchone()[0]
     if count > 0:
         conn.close()
         return
@@ -131,11 +143,22 @@ def seed_synthetic_feedback():
         synthetic_posts.append((
             f"synth_{i}", platform, json.dumps(tags),
             likes, shares, comments, post_time.isoformat(),
+            "gps-telematics", "synthetic",
         ))
 
     conn.executemany(
-        "INSERT INTO post_feedback (post_id, platform, tags_used, likes, shares, comments, posted_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO post_feedback (post_id, platform, tags_used, likes, shares, comments, posted_at, niche, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         synthetic_posts,
     )
     conn.commit()
     conn.close()
+
+
+def get_feedback_by_niche(niche: str) -> list[dict]:
+    conn = _get_conn()
+    rows = conn.execute(
+        "SELECT * FROM post_feedback WHERE niche = ? ORDER BY posted_at DESC",
+        (niche,),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
