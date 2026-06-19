@@ -26,6 +26,7 @@ class TestScoreEndpoint:
             "topic": "AI dashcams for fleet safety",
             "product": "Vignan Dashcam AI",
             "platform": "LinkedIn",
+            "niche": "gps-telematics",
         })
         assert resp.status_code == 200
         data = resp.json()
@@ -33,13 +34,25 @@ class TestScoreEndpoint:
         assert "gap_tags" in data
         assert "confidence" in data
         assert "fallback_mode" in data
+        assert "niche" in data
         assert len(data["ranked_tags"]) > 0
+
+    def test_valid_request_default_niche(self):
+        resp = client.post("/api/score", json={
+            "topic": "GPS tracking for fleet",
+            "product": "Tracker Pro",
+            "platform": "LinkedIn",
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["niche"] == "gps-telematics"
 
     def test_with_baseline(self):
         resp = client.post("/api/score", json={
             "topic": "real-time GPS telematics",
             "product": "AjnaView GPS",
             "platform": "Instagram",
+            "niche": "gps-telematics",
             "include_baseline": True,
         })
         assert resp.status_code == 200
@@ -53,6 +66,15 @@ class TestScoreEndpoint:
             "topic": "test",
             "product": "test",
             "platform": "Discord",
+        })
+        assert resp.status_code == 422
+
+    def test_invalid_niche_returns_422(self):
+        resp = client.post("/api/score", json={
+            "topic": "test",
+            "product": "test",
+            "platform": "LinkedIn",
+            "niche": "nonexistent-niche",
         })
         assert resp.status_code == 422
 
@@ -75,6 +97,7 @@ class TestScoreEndpoint:
             "topic": "",
             "product": "Vignan",
             "platform": "LinkedIn",
+            "niche": "gps-telematics",
         })
         assert resp.status_code == 200
         data = resp.json()
@@ -85,6 +108,7 @@ class TestScoreEndpoint:
             "topic": "advanced real-time computer vision for fleet driver behavior monitoring",
             "product": "Vignan Dashcam AI",
             "platform": "X",
+            "niche": "gps-telematics",
         })
         assert resp.status_code == 200
         data = resp.json()
@@ -96,6 +120,7 @@ class TestScoreEndpoint:
                 "topic": f"fleet safety for {platform}",
                 "product": "Test Product",
                 "platform": platform,
+                "niche": "gps-telematics",
             })
             assert resp.status_code == 200
 
@@ -106,6 +131,7 @@ class TestFeedbackEndpoint:
         resp = client.post("/api/feedback", json={
             "post_id": "test_fb_001",
             "platform": "LinkedIn",
+            "niche": "gps-telematics",
             "tags_used": ["fleet safety", "AI dashcams"],
             "engagement": {"likes": 100, "shares": 20, "comments": 10},
         })
@@ -118,6 +144,7 @@ class TestFeedbackEndpoint:
             resp = client.post("/api/feedback", json={
                 "post_id": f"test_{platform}",
                 "platform": platform,
+                "niche": "gps-telematics",
                 "tags_used": ["test tag"],
                 "engagement": {"likes": 10, "shares": 1, "comments": 1},
             })
@@ -127,6 +154,7 @@ class TestFeedbackEndpoint:
         resp = client.post("/api/feedback", json={
             "post_id": "test",
             "platform": "LinkedIn",
+            "niche": "gps-telematics",
             "tags_used": ["test"],
         })
         assert resp.status_code == 422
@@ -135,10 +163,45 @@ class TestFeedbackEndpoint:
         resp = client.post("/api/feedback", json={
             "post_id": "test",
             "platform": "Discord",
+            "niche": "gps-telematics",
             "tags_used": ["test"],
             "engagement": {"likes": 1, "shares": 1, "comments": 1},
         })
         assert resp.status_code == 422
+
+
+class TestNicheEndpoints:
+
+    def test_list_niches(self):
+        resp = client.get("/api/niches")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "niches" in data
+        assert "active" in data
+        assert len(data["niches"]) >= 3
+
+    def test_switch_niche(self):
+        resp = client.post("/api/niches/switch", json={"niche_id": "b2b-saas"})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["active"] == "b2b-saas"
+
+        # Switch back
+        client.post("/api/niches/switch", json={"niche_id": "gps-telematics"})
+
+    def test_switch_invalid_niche(self):
+        resp = client.post("/api/niches/switch", json={"niche_id": "nonexistent"})
+        assert resp.status_code == 422
+
+    def test_create_niche_validation(self):
+        resp = client.post("/api/niches/create", json={
+            "niche_id": "test-niche",
+            "display_name": "Test Niche",
+            "description": "Testing",
+            "sample_posts": ["only one post"],
+        })
+        assert resp.status_code == 422
+        assert "20" in resp.json()["detail"]
 
 
 class TestIngestEndpoint:

@@ -11,3 +11,4 @@ pydantic
 python-dotenv
 numpy
 scikit-learn
+praw
