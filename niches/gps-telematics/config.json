@@ -1,0 +1,8 @@
+{
+  "niche_id": "gps-telematics",
+  "display_name": "GPS & Telematics",
+  "description": "Fleet telematics, GPS hardware integration, vehicle tracking, and logistics operations for transport and delivery fleets",
+  "default_platforms": ["LinkedIn", "Instagram", "X", "TikTok"],
+  "sample_topics": ["fleet GPS tracking ROI", "telematics dashboards for dispatch", "ELD compliance solutions", "real-time vehicle location"],
+  "created_at": "2026-06-19T00:00:00Z"
+}

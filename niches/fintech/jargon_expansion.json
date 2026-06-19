@@ -1,0 +1,25 @@
+{
+  "niche": "fintech",
+  "industry_terms": {
+    "payments": ["digital wallet", "payment gateway", "real-time payments", "ACH transfer", "card-present transaction", "card-not-present", "tokenization", "PCI compliance", "3D Secure", "payment orchestration"],
+    "lending": ["buy now pay later", "point-of-sale lending", "credit scoring", "risk underwriting", "loan origination", "debt collection", "alternative credit data", "income verification", "collateral management", "debt consolidation"],
+    "banking": ["neobank", "challenger bank", "digital banking", "open banking API", "banking-as-a-service", "core banking platform", "KYC verification", "AML screening", "deposit account", "savings product"],
+    "stakeholders": ["fintech founder", "payments engineer", "compliance officer", "risk analyst", "product manager payments", "banking partner", "regulatory advisor", "merchant acquirer", "issuing bank", "network scheme"],
+    "regulatory": ["PCI DSS", "GDPR", "PSD2", "KYC/AML", "BSA compliance", "OFAC screening", "ECB regulation", "CFPB guidelines", "state money transmitter license", "charter bank"],
+    "pain_points": ["payment failure rates", "fraud prevention friction", "regulatory fragmentation", "cross-border settlement delays", "chargeback disputes", "bank partnership timelines", "legacy integration complexity", "compliance cost burden", "customer onboarding drop-off", "interchange fee pressure"]
+  },
+  "abbreviations": {
+    "ACH": "Automated Clearing House",
+    "PCI": "Payment Card Industry",
+    "KYC": "Know Your Customer",
+    "AML": "Anti-Money Laundering",
+    "BNPL": "Buy Now Pay Later",
+    "PSD2": "Payment Services Directive 2",
+    "GDPR": "General Data Protection Regulation",
+    "OFAC": "Office of Foreign Assets Control",
+    "DSS": "Data Security Standard",
+    "BSA": "Bank Secrecy Act"
+  },
+  "adjacent_industries": ["banking", "insurance", "capital markets", "real estate", "e-commerce", "remittances", "cryptocurrency", "regtech"],
+  "trending_concepts": ["embedded finance", "open banking", "real-time payments", "stablecoin settlement", "decentralized finance", "AI credit underwriting", "payfac model", "banking-as-a-service"]
+}

@@ -1,0 +1,25 @@
+{
+  "niche": "gps-telematics",
+  "industry_terms": {
+    "hardware": ["GPS tracker", "OBD-II dongle", "telematics gateway", "in-vehicle sensor", "CAN bus interface", "4G LTE modem", "GNSS receiver", "dual-band GPS", "Bluetooth beacon", "dashcam DVR"],
+    "software": ["fleet management platform", "dispatch dashboard", "geofencing engine", "route optimization API", "real-time tracking UI", "driver scorecard", "maintenance scheduler", "fuel analytics", "ELD logging", "asset utilization report"],
+    "operations": ["last-mile delivery", "dispatch coordination", "route compliance", "idle time reduction", "fuel efficiency", "cold chain monitoring", "trailer tracking", "mixed fleet management", "driver safety scoring", "HOS compliance"],
+    "stakeholders": ["fleet manager", "logistics coordinator", "transport operator", "safety director", "compliance officer", "dispatcher", "owner-operator", "private fleet", "dedicated carrier", "brokerage"],
+    "metrics": ["vehicle uptime", "on-time delivery rate", "miles per gallon", "hard brake events", "engine idle percentage", "utilization rate", "route deviation", "driver score", "maintenance SLA", "fuel cost per mile"],
+    "pain_points": ["unplanned downtime", "fuel theft", "route deviation", "driver turnover", "compliance fines", "deadhead miles", "paper logbooks", "invisible assets", "repair cost overruns", "insurance premium spikes"]
+  },
+  "abbreviations": {
+    "GPS": "Global Positioning System",
+    "ELD": "Electronic Logging Device",
+    "HOS": "Hours of Service",
+    "OBD": "On-Board Diagnostics",
+    "CAN": "Controller Area Network",
+    "GNSS": "Global Navigation Satellite System",
+    "IFTA": "International Fuel Tax Agreement",
+    "DVIR": "Driver Vehicle Inspection Report",
+    "PTO": "Power Take-Off",
+    "API": "Application Programming Interface"
+  },
+  "adjacent_industries": ["transportation", "logistics", "supply chain", "field service", "construction fleet", "cold storage", "refrigerated transport", "public transit"],
+  "trending_concepts": ["video telematics", "AI dashcam", "predictive maintenance", "electric fleet", "usage-based insurance", "autonomous trucking", "digital freight matching", "real-time visibility platform"]
+}

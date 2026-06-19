@@ -1,0 +1,8 @@
+{
+  "niche_id": "b2b-saas",
+  "display_name": "B2B SaaS",
+  "description": "Business-to-business software products, cloud platforms, enterprise sales, and subscription-based technology services",
+  "default_platforms": ["LinkedIn", "X", "Instagram"],
+  "sample_topics": ["PLG vs enterprise sales motion", "product-led growth metrics", "SaaS churn reduction strategies", "b2b content marketing ROI"],
+  "created_at": "2026-06-19T00:00:00Z"
+}

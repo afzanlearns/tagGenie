@@ -1,0 +1,8 @@
+{
+  "niche_id": "fintech",
+  "display_name": "Fintech & Payments",
+  "description": "Financial technology including digital payments, lending, banking infrastructure, wealth management, and regulatory compliance",
+  "default_platforms": ["LinkedIn", "X", "Instagram"],
+  "sample_topics": ["embedded finance trends", "open banking adoption", "BNPL market evolution", "digital wallet payment infrastructure"],
+  "created_at": "2026-06-19T00:00:00Z"
+}

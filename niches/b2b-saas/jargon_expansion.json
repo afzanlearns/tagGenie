@@ -1,0 +1,25 @@
+{
+  "niche": "b2b-saas",
+  "industry_terms": {
+    "go_to_market": ["product-led growth", "sales-led enterprise", "self-serve funnel", "PLG motion", "demand generation", "account-based marketing", "outbound sales", "inbound pipeline", "channel partnerships", "top-of-funnel"],
+    "metrics": ["MRR", "ARR", "net revenue retention", "gross retention", "LTV:CAC ratio", "monthly churn rate", "activation rate", "time-to-value", "NPS score", "expansion revenue"],
+    "product": ["SaaS platform", "cloud infrastructure", "API product", "multi-tenant architecture", "integration marketplace", "enterprise SSO", "role-based access", "white-label option", "usage-based pricing", "tiered subscription"],
+    "stages": ["seed stage", "Series A", "growth stage", "enterprise phase", "pre-revenue", "ramp-up", "scaling", "maturity"],
+    "stakeholders": ["CRO", "VP of Sales", "demand gen manager", "product marketer", "customer success lead", "SDR team", "AE team", "revops analyst", "head of growth", "founding team"],
+    "pain_points": ["long sales cycles", "high churn", "low activation", "product-market fit uncertainty", "sales and marketing misalignment", "data silos", "integration debt", "pricing complexity", "multi-threaded deal management", "contract negotiation friction"]
+  },
+  "abbreviations": {
+    "MRR": "Monthly Recurring Revenue",
+    "ARR": "Annual Recurring Revenue",
+    "PLG": "Product-Led Growth",
+    "LTV": "Lifetime Value",
+    "CAC": "Customer Acquisition Cost",
+    "NPS": "Net Promoter Score",
+    "SDR": "Sales Development Representative",
+    "AE": "Account Executive",
+    "CRO": "Chief Revenue Officer",
+    "SSO": "Single Sign-On"
+  },
+  "adjacent_industries": ["enterprise software", "cloud computing", "fintech infrastructure", "HR tech", "martech", "sales enablement", "customer success platforms", "developer tools"],
+  "trending_concepts": ["AI copilot", "usage-based pricing", "product-qualified leads", "vertical SaaS", "embedded finance", "no-code integrations", "revenue intelligence", "conversational sales"]
+}
