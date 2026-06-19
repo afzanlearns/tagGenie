@@ -2,11 +2,14 @@ from pydantic import BaseModel
 from typing import Optional, Literal
 from datetime import datetime
 
+VALID_PLATFORMS = {"LinkedIn", "Instagram", "X", "TikTok"}
+
 
 class ScoreRequest(BaseModel):
     topic: str
     product: str
     platform: Literal["LinkedIn", "Instagram", "X", "TikTok"]
+    niche: str = "gps-telematics"
     include_baseline: bool = False
 
 
@@ -37,6 +40,7 @@ class BaselineTag(BaseModel):
 class ScoreResponse(BaseModel):
     topic: str
     platform: str
+    niche: str = "gps-telematics"
     ranked_tags: list[CandidateTag]
     gap_tags: list[GapTag]
     baseline_tags: list[BaselineTag] = []
@@ -56,6 +60,7 @@ class FeedbackRequest(BaseModel):
     platform: Literal["LinkedIn", "Instagram", "X", "TikTok"]
     tags_used: list[str]
     engagement: EngagementMetrics
+    niche: str = "gps-telematics"
 
 
 class IngestTopic(BaseModel):
@@ -65,3 +70,27 @@ class IngestTopic(BaseModel):
 
 class IngestRequest(BaseModel):
     topics: list[IngestTopic]
+
+
+class CreateNicheRequest(BaseModel):
+    niche_id: str
+    display_name: str
+    description: str = ""
+    sample_posts: list[str]
+
+
+class SignupRequest(BaseModel):
+    email: str
+    password: str
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class AuthResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user_id: int
+    email: str

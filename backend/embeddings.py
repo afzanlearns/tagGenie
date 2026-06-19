@@ -3,14 +3,14 @@ import chromadb
 import numpy as np
 from pathlib import Path
 from sentence_transformers import SentenceTransformer
+from backend.niche_manager import get_seed_corpus, get_active_niche
 
-COLLECTION_NAME = "fleet_social_corpus"
 DATA_DIR = Path(__file__).parent.parent / "data"
 
 _embedder = None
 _client = None
-_collection = None
-_corpus_size = 0
+_collections = {}
+_corpus_sizes = {}
 
 
 def _get_embedder():
@@ -20,32 +20,34 @@ def _get_embedder():
     return _embedder
 
 
-def _get_collection():
-    global _client, _collection
-    if _collection is not None:
-        return _collection
+def _get_collection(collection_name: str):
+    global _client, _collections
+    if collection_name in _collections:
+        return _collections[collection_name]
     persist_dir = str(DATA_DIR / "chroma_db")
-    _client = chromadb.PersistentClient(path=persist_dir)
+    if _client is None:
+        _client = chromadb.PersistentClient(path=persist_dir)
     try:
-        _collection = _client.get_collection(COLLECTION_NAME)
+        collection = _client.get_collection(collection_name)
     except Exception:
-        _collection = _client.create_collection(
-            COLLECTION_NAME, metadata={"hnsw:space": "cosine"}
+        collection = _client.create_collection(
+            collection_name, metadata={"hnsw:space": "cosine"}
         )
-    return _collection
+    _collections[collection_name] = collection
+    return collection
 
 
-def seed_corpus():
-    collection = _get_collection()
+def seed_corpus(niche_id: str = None):
+    if niche_id is None:
+        niche_id = get_active_niche()
+
+    collection = _get_collection(niche_id)
     if collection.count() > 0:
         return collection.count()
 
-    corpus_file = DATA_DIR / "seed_corpus.json"
-    if not corpus_file.exists():
+    posts = get_seed_corpus(niche_id)
+    if not posts:
         return 0
-
-    with open(corpus_file) as f:
-        posts = json.load(f)
 
     embedder = _get_embedder()
     embeddings = embedder.encode(posts, show_progress_bar=False).tolist()
@@ -55,17 +57,22 @@ def seed_corpus():
     return len(posts)
 
 
-def get_corpus_size() -> int:
-    global _corpus_size
-    if _corpus_size == 0:
-        collection = _get_collection()
-        _corpus_size = collection.count()
-    return _corpus_size
+def get_corpus_size(niche_id: str = None) -> int:
+    if niche_id is None:
+        niche_id = get_active_niche()
+
+    if niche_id not in _corpus_sizes or _corpus_sizes[niche_id] == 0:
+        collection = _get_collection(niche_id)
+        _corpus_sizes[niche_id] = collection.count()
+    return _corpus_sizes[niche_id]
 
 
-def compute_competition_score(tag: str) -> float:
+def compute_competition_score(tag: str, niche_id: str = None) -> float:
+    if niche_id is None:
+        niche_id = get_active_niche()
+
     embedder = _get_embedder()
-    collection = _get_collection()
+    collection = _get_collection(niche_id)
     tag_embedding = embedder.encode([tag], show_progress_bar=False).tolist()
 
     results = collection.query(

@@ -3,8 +3,8 @@ from sklearn.feature_extraction.text import CountVectorizer
 import spacy
 import json
 from pathlib import Path
+from backend.niche_manager import get_seed_corpus, get_active_niche
 
-DATA_DIR = Path(__file__).parent.parent / "data"
 _nlp = None
 
 
@@ -29,17 +29,16 @@ def _extract_raw_terms(text: str) -> list[str]:
     return list(tokens)
 
 
-def score_baseline(topic: str, product: str) -> list[dict]:
+def score_baseline(topic: str, product: str, niche_id: str = None) -> list[dict]:
+    if niche_id is None:
+        niche_id = get_active_niche()
+
     combined = f"{topic} {product}"
     terms = _extract_raw_terms(combined)
     if not terms:
         return []
 
-    corpus_file = DATA_DIR / "seed_corpus.json"
-    corpus = []
-    if corpus_file.exists():
-        with open(corpus_file) as f:
-            corpus = json.load(f)
+    corpus = get_seed_corpus(niche_id)
 
     all_docs = corpus + [combined]
     vectorizer = TfidfVectorizer(
@@ -56,7 +55,7 @@ def score_baseline(topic: str, product: str) -> list[dict]:
     for term in terms:
         matches = [i for i, feat in enumerate(feature_names) if feat == term or feat.replace(" ", "") == term.replace(" ", "")]
         if matches:
-            score = round(min(100.0, float(combined_vec[matches[0]]) * 100.0), 1)
+            score = float(round(min(100.0, float(combined_vec[matches[0]]) * 100.0), 1))
         else:
             score = 0.0
 
@@ -77,8 +76,8 @@ def score_baseline(topic: str, product: str) -> list[dict]:
         if feat in terms:
             continue
         tag_type = "hashtag" if len(feat.split()) <= 2 else "keyword"
-        tf = count_vec_arr[idx]
-        score = round(min(100.0, (tf / max(1, count_vec_arr.max())) * 60.0), 1)
+        tf = float(count_vec_arr[idx])
+        score = float(round(min(100.0, (tf / max(1, float(count_vec_arr.max()))) * 60.0), 1))
         results.append({"tag": feat, "type": tag_type, "score": score})
 
     results.sort(key=lambda x: x["score"], reverse=True)

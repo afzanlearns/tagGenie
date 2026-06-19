@@ -3,6 +3,7 @@ import spacy
 import json
 from pathlib import Path
 from backend.llm import expand_topic
+from backend.niche_manager import get_active_niche
 
 _ke_model = None
 _nlp = None
@@ -42,8 +43,11 @@ def extract_hashtags(text: str, top_n: int = 15) -> list[str]:
     return tags
 
 
-def extract_candidates(topic: str, product: str) -> list[dict]:
-    expanded = expand_topic(topic, product)
+def extract_candidates(topic: str, product: str, niche_id: str = None) -> list[dict]:
+    if niche_id is None:
+        niche_id = get_active_niche()
+
+    expanded = expand_topic(topic, product, niche_id)
     if not expanded or not expanded.strip():
         expanded = f"{topic} {product}"
 

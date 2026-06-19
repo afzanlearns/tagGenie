@@ -7,6 +7,7 @@ from backend import embeddings
 from backend import trends
 from backend import llm
 from backend.models import CandidateTag, GapTag, ScoreResponse
+from backend.niche_manager import get_active_niche
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 WEIGHTS_FILE = DATA_DIR / "weights.json"
@@ -45,11 +46,13 @@ def save_weights():
         )
 
 
-def compute_confidence(fallback_mode: bool) -> float:
+def compute_confidence(fallback_mode: bool, niche_id: str = None) -> float:
+    if niche_id is None:
+        niche_id = get_active_niche()
     confidence = 100.0
     if fallback_mode:
         confidence -= 30
-    if embeddings.get_corpus_size() < 20:
+    if embeddings.get_corpus_size(niche_id) < 20:
         confidence -= 10
     return confidence
 
@@ -62,13 +65,14 @@ def semantic_relevance(tag: str, topic: str) -> float:
     return round(min(100.0, max(0.0, sim * 100.0)), 1)
 
 
-def score_topic(topic: str, product: str, platform: str) -> ScoreResponse:
-    embeddings.seed_corpus()
+def score_topic(topic: str, product: str, platform: str, niche_id: str = None) -> ScoreResponse:
+    if niche_id is None:
+        niche_id = get_active_niche()
 
-    candidates = extraction.extract_candidates(topic, product)
+    embeddings.seed_corpus(niche_id)
+
+    candidates = extraction.extract_candidates(topic, product, niche_id)
     pw = PLATFORM_WEIGHTS.get(platform, {"hashtag": 0.5, "keyword": 0.5})
-
-    topic_sim = embeddings.get_topic_embedding(topic)
 
     global_fallback = False
     ranked = []
@@ -86,9 +90,9 @@ def score_topic(topic: str, product: str, platform: str) -> ScoreResponse:
         rel = semantic_relevance(tag, topic)
         reach_score = round((trend_volume * 0.6) + (rel * 0.4), 1)
 
-        comp_score = embeddings.compute_competition_score(tag)
+        comp_score = embeddings.compute_competition_score(tag, niche_id)
 
-        confidence = compute_confidence(trend_data["fallback_mode"])
+        confidence = compute_confidence(trend_data["fallback_mode"], niche_id)
         composite = (
             (reach_score * 0.5)
             + ((100 - comp_score) * 0.3)
@@ -109,13 +113,14 @@ def score_topic(topic: str, product: str, platform: str) -> ScoreResponse:
                               competition_score=comp_score, reason=reason))
 
     ranked.sort(key=lambda x: x["final_score"], reverse=True)
-    top_confidence = compute_confidence(global_fallback)
+    top_confidence = compute_confidence(global_fallback, niche_id)
 
     top_10 = ranked[:10]
     for item in top_10:
         item["rationale"] = llm.generate_rationale(
             item["tag"], item["reach_score"],
-            item["competition_score"], item["final_score"]
+            item["competition_score"], item["final_score"],
+            niche_id
         )
 
     ranked_tags = [
@@ -127,6 +132,7 @@ def score_topic(topic: str, product: str, platform: str) -> ScoreResponse:
     return ScoreResponse(
         topic=topic,
         platform=platform,
+        niche=niche_id,
         ranked_tags=ranked_tags,
         gap_tags=gap,
         confidence=top_confidence,

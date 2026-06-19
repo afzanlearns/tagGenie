@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 from groq import Groq
+from backend.niche_manager import build_jargon_context, get_active_niche
 
 load_dotenv(Path(__file__).parent / ".env")
 
@@ -15,12 +16,18 @@ def _get_client():
     return _client
 
 
-def expand_topic(topic: str, product: str) -> str:
+def expand_topic(topic: str, product: str, niche_id: str = None) -> str:
+    if niche_id is None:
+        niche_id = get_active_niche()
+
     client = _get_client()
+    jargon = build_jargon_context(niche_id)
+
     prompt = (
-        f"You are a fleet-tech and telematics industry expert. "
+        f"You are an industry expert in the '{niche_id}' domain. "
         f"Expand the following topic with 5-8 related industry terms, jargon, synonyms, "
-        f"and adjacent concepts specific to fleet technology, telematics, dashcams, and logistics.\n\n"
+        f"and adjacent concepts specific to this industry.\n\n"
+        f"Industry context — relevant terms and jargon:\n{jargon}\n\n"
         f"Topic: {topic}\nProduct: {product}\n\n"
         f"Return ONLY a natural paragraph of 3-5 sentences that includes the original topic "
         f"and weaves in the expanded terms contextually. Do not use bullet points or lists."
@@ -35,15 +42,20 @@ def expand_topic(topic: str, product: str) -> str:
         )
         return resp.choices[0].message.content.strip()
     except Exception:
-        return f"{topic} {product} fleet technology telematics dashcam safety logistics predictive maintenance real-time monitoring"
+        return f"{topic} {product} {niche_id} industry terms trends best practices"
 
 
 def generate_rationale(
-    tag: str, reach_score: float, competition_score: float, final_score: float
+    tag: str, reach_score: float, competition_score: float, final_score: float,
+    niche_id: str = None
 ) -> str:
+    if niche_id is None:
+        niche_id = get_active_niche()
+
     client = _get_client()
     prompt = (
-        f"Generate ONE sentence explaining why the tag '{tag}' ranks where it does. "
+        f"Generate ONE sentence explaining why the tag '{tag}' ranks where it does "
+        f"in the '{niche_id}' industry context. "
         f"Use ONLY these numbers:\n"
         f"- Reach score: {reach_score:.1f}/100\n"
         f"- Competition score: {competition_score:.1f}/100 (higher = more saturated)\n"
@@ -63,8 +75,8 @@ def generate_rationale(
         return resp.choices[0].message.content.strip()
     except Exception:
         if competition_score < 30 and reach_score > 60:
-            return f"High reach ({reach_score:.0f}) with low saturation ({competition_score:.0f}) — an underused term in this niche right now."
+            return f"High reach ({reach_score:.0f}) with low saturation ({competition_score:.0f}) — an underused term in {niche_id} right now."
         elif competition_score > 70:
-            return f"Reach of {reach_score:.0f} but high competition ({competition_score:.0f}) — a crowded space where differentiation is difficult."
+            return f"Reach of {reach_score:.0f} but high competition ({competition_score:.0f}) — a crowded space in this niche."
         else:
             return f"Balanced reach ({reach_score:.0f}) and competition ({competition_score:.0f}) yielding final score of {final_score:.0f}."
