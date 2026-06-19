@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-export default function FeedbackSimulator({ tags, platform }) {
+export default function FeedbackSimulator({ tags, platform, niche = 'gps-telematics' }) {
   const [feedbackSent, setFeedbackSent] = useState(false)
   const [message, setMessage] = useState('')
 
@@ -20,6 +20,7 @@ export default function FeedbackSimulator({ tags, platform }) {
         body: JSON.stringify({
           post_id: `sim_${Date.now()}`,
           platform,
+          niche,
           tags_used: selectedTags,
           engagement,
         }),

@@ -8,7 +8,7 @@ import DemoMode from './components/DemoMode'
 
 const PLATFORMS = ['LinkedIn', 'Instagram', 'X', 'TikTok']
 
-export default function App() {
+export default function App({ onLogout }) {
   const [topic, setTopic] = useState('')
   const [product, setProduct] = useState('')
   const [platform, setPlatform] = useState('LinkedIn')
@@ -18,6 +18,36 @@ export default function App() {
   const [tab, setTab] = useState('results')
   const [demoMode, setDemoMode] = useState(false)
 
+  const [niches, setNiches] = useState([])
+  const [activeNiche, setActiveNiche] = useState('gps-telematics')
+  const [showNichePanel, setShowNichePanel] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/niches')
+      .then(r => r.json())
+      .then(data => {
+        setNiches(data.niches || [])
+        setActiveNiche(data.active || 'gps-telematics')
+      })
+      .catch(() => {})
+  }, [])
+
+  const handleNicheSwitch = async (nicheId) => {
+    try {
+      const res = await fetch('/api/niches/switch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ niche_id: nicheId }),
+      })
+      if (res.ok) {
+        setActiveNiche(nicheId)
+        setResults(null)
+      }
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
   const handleScore = async () => {
     if (!topic.trim() || !product.trim()) return
     setLoading(true)
@@ -26,7 +56,13 @@ export default function App() {
       const res = await fetch('/api/score', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic: topic.trim(), product: product.trim(), platform, include_baseline: true }),
+        body: JSON.stringify({
+          topic: topic.trim(),
+          product: product.trim(),
+          platform,
+          niche: activeNiche,
+          include_baseline: true,
+        }),
       })
       if (!res.ok) throw new Error(`Server error: ${res.status}`)
       const data = await res.json()
@@ -44,34 +80,85 @@ export default function App() {
     setPlatform(demoPlatform)
   }
 
+  const currentNicheName = niches.find(n => n.niche_id === activeNiche)?.display_name || activeNiche
+
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--canvas)', color: 'var(--text)', fontFamily: 'var(--font)' }}>
       <header className="border-b px-6 py-4" style={{ borderColor: '#1C1C1C' }}>
         <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div>
-            <h1 className="text-lg tracking-tight" style={{ color: 'var(--text)' }}>TagGenie</h1>
-            <p className="text-xs mt-0.5" style={{ color: '#555' }}>Distribution Intelligence Engine</p>
+          <div className="flex items-center gap-4">
+            <div>
+              <h1 className="text-lg tracking-tight" style={{ color: 'var(--text)' }}>TagGenie</h1>
+              <p className="text-xs mt-0.5" style={{ color: '#555' }}>Distribution Intelligence Engine</p>
+            </div>
+            <div className="flex items-center gap-2 ml-6 pl-6 border-l" style={{ borderColor: '#1C1C1C' }}>
+              <span className="text-xs" style={{ color: '#555' }}>NICHE</span>
+              <select
+                value={activeNiche}
+                onChange={e => handleNicheSwitch(e.target.value)}
+                className="text-xs px-2 py-1 border appearance-none focus:outline-none"
+                style={{
+                  backgroundColor: 'transparent',
+                  borderColor: '#333',
+                  color: 'var(--text)',
+                  borderRadius: '0',
+                }}
+              >
+                {niches.map(n => (
+                  <option key={n.niche_id} value={n.niche_id}>{n.display_name}</option>
+                ))}
+              </select>
+              <button
+                onClick={() => setShowNichePanel(!showNichePanel)}
+                className="text-xs px-2 py-1"
+                style={{
+                  backgroundColor: 'transparent',
+                  border: '1px solid #333',
+                  color: '#888',
+                  cursor: 'pointer',
+                }}
+              >
+                + CUSTOM
+              </button>
+            </div>
           </div>
           {results && (
             <div className="flex items-center gap-3 text-xs" style={{ color: '#666' }}>
+              <span>Niche: {currentNicheName}</span>
               <span>Confidence: {results.confidence}%</span>
               {results.fallback_mode && (
                 <span style={{ color: 'var(--accent)' }}>FALLBACK</span>
               )}
             </div>
           )}
-          <button
-            onClick={() => setDemoMode(!demoMode)}
-            className="text-xs px-3 py-1"
-            style={{
-              backgroundColor: demoMode ? 'var(--accent)' : 'transparent',
-              color: demoMode ? 'var(--text)' : '#555',
-              border: `1px solid ${demoMode ? 'var(--accent)' : '#333'}`,
-              cursor: 'pointer',
-            }}
-          >
-            {demoMode ? 'DEMO ON' : 'DEMO MODE'}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setDemoMode(!demoMode)}
+              className="text-xs px-3 py-1"
+              style={{
+                backgroundColor: demoMode ? 'var(--accent)' : 'transparent',
+                color: demoMode ? 'var(--text)' : '#555',
+                border: `1px solid ${demoMode ? 'var(--accent)' : '#333'}`,
+                cursor: 'pointer',
+              }}
+            >
+              {demoMode ? 'DEMO ON' : 'DEMO MODE'}
+            </button>
+            {onLogout && (
+              <button
+                onClick={onLogout}
+                className="text-xs px-3 py-1"
+                style={{
+                  backgroundColor: 'transparent',
+                  color: '#555',
+                  border: '1px solid #333',
+                  cursor: 'pointer',
+                }}
+              >
+                LOG OUT
+              </button>
+            )}
+          </div>
         </div>
       </header>
 
@@ -83,13 +170,26 @@ export default function App() {
           platforms={PLATFORMS}
           onScore={handleScore}
           loading={loading}
+          activeNiche={currentNicheName}
         />
+
+        {showNichePanel && (
+          <CustomNichePanel
+            onCreated={(newNiche) => {
+              setNiches(prev => [...prev, newNiche])
+              handleNicheSwitch(newNiche.niche_id)
+              setShowNichePanel(false)
+            }}
+            onClose={() => setShowNichePanel(false)}
+          />
+        )}
 
         <DemoMode
           enabled={demoMode}
           onToggle={() => setDemoMode(false)}
           onDemoSelect={handleDemoSelect}
           onDemoScore={handleScore}
+          activeNiche={activeNiche}
         />
 
         {error && (
@@ -150,12 +250,157 @@ export default function App() {
             <div className="border border-t-0 p-6" style={{ borderColor: '#1C1C1C' }}>
               {tab === 'results' && <ResultsTable tags={results.ranked_tags} />}
               {tab === 'gaps' && <GapFinder gaps={results.gap_tags} />}
-              {tab === 'feedback' && <FeedbackSimulator tags={results.ranked_tags} platform={platform} />}
+              {tab === 'feedback' && <FeedbackSimulator tags={results.ranked_tags} platform={platform} niche={activeNiche} />}
               {tab === 'comparison' && <ComparisonView tagGenieTags={results.ranked_tags} baselineTags={results.baseline_tags || []} gapTags={results.gap_tags} />}
             </div>
           </div>
         )}
       </main>
+    </div>
+  )
+}
+
+function CustomNichePanel({ onCreated, onClose }) {
+  const [nicheId, setNicheId] = useState('')
+  const [displayName, setDisplayName] = useState('')
+  const [description, setDescription] = useState('')
+  const [postsText, setPostsText] = useState('')
+  const [creating, setCreating] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleCreate = async () => {
+    const samplePosts = postsText
+      .split('\n')
+      .map(p => p.trim())
+      .filter(p => p.length > 10)
+
+    if (samplePosts.length < 20) {
+      setError(`Need at least 20 sample posts (got ${samplePosts.length})`)
+      return
+    }
+
+    setCreating(true)
+    setError('')
+    try {
+      const res = await fetch('/api/niches/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          niche_id: nicheId.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-'),
+          display_name: displayName.trim(),
+          description: description.trim(),
+          sample_posts: samplePosts,
+        }),
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.detail || 'Creation failed')
+      }
+      const data = await res.json()
+      onCreated(data.niche)
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  return (
+    <div className="border p-6 mt-4" style={{ borderColor: 'var(--accent)' }}>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <span className="text-xs px-2 py-0.5" style={{ backgroundColor: 'var(--accent)', color: 'var(--text)' }}>
+            CREATE CUSTOM NICHE
+          </span>
+          <span className="text-xs" style={{ color: '#555' }}>
+            Paste 20+ sample posts from your industry to auto-generate a niche
+          </span>
+        </div>
+        <button
+          onClick={onClose}
+          className="text-xs px-3 py-1"
+          style={{ backgroundColor: 'transparent', border: '1px solid #333', color: '#555', cursor: 'pointer' }}
+        >
+          CLOSE
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+        <div>
+          <label className="block text-xs mb-1.5" style={{ color: '#555' }}>NICHE ID</label>
+          <input
+            type="text"
+            value={nicheId}
+            onChange={e => setNicheId(e.target.value)}
+            placeholder="e.g., my-industry"
+            className="w-full px-3 py-2 text-sm border focus:outline-none"
+            style={{ backgroundColor: 'transparent', borderColor: '#333', color: 'var(--text)' }}
+          />
+        </div>
+        <div>
+          <label className="block text-xs mb-1.5" style={{ color: '#555' }}>DISPLAY NAME</label>
+          <input
+            type="text"
+            value={displayName}
+            onChange={e => setDisplayName(e.target.value)}
+            placeholder="e.g., My Industry"
+            className="w-full px-3 py-2 text-sm border focus:outline-none"
+            style={{ backgroundColor: 'transparent', borderColor: '#333', color: 'var(--text)' }}
+          />
+        </div>
+        <div>
+          <label className="block text-xs mb-1.5" style={{ color: '#555' }}>DESCRIPTION (optional)</label>
+          <input
+            type="text"
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+            placeholder="Brief description of the industry"
+            className="w-full px-3 py-2 text-sm border focus:outline-none"
+            style={{ backgroundColor: 'transparent', borderColor: '#333', color: 'var(--text)' }}
+          />
+        </div>
+      </div>
+
+      <div className="mb-4">
+        <label className="block text-xs mb-1.5" style={{ color: '#555' }}>
+          SAMPLE POSTS (one per line, minimum 20)
+        </label>
+        <textarea
+          value={postsText}
+          onChange={e => setPostsText(e.target.value)}
+          placeholder="Paste one social media post per line from your industry&#10;Each post should be a realistic example of content relevant to your niche&#10;Min 20 posts required..."
+          rows={8}
+          className="w-full px-3 py-2 text-sm border focus:outline-none"
+          style={{ backgroundColor: 'transparent', borderColor: '#333', color: 'var(--text)', resize: 'vertical' }}
+        />
+      </div>
+
+      <div className="flex items-center gap-3">
+        <button
+          onClick={handleCreate}
+          disabled={creating}
+          className="px-6 py-2 text-xs font-medium disabled:opacity-30"
+          style={{
+            backgroundColor: 'var(--accent)',
+            color: 'var(--text)',
+            border: 'none',
+            cursor: creating ? 'wait' : 'pointer',
+          }}
+        >
+          {creating ? 'CREATING...' : 'CREATE NICHE'}
+        </button>
+        {postsText.split('\n').filter(p => p.trim().length > 10).length > 0 && (
+          <span className="text-xs" style={{ color: '#555' }}>
+            {postsText.split('\n').filter(p => p.trim().length > 10).length} posts
+          </span>
+        )}
+      </div>
+
+      {error && (
+        <div className="mt-3 text-xs" style={{ color: 'var(--accent)' }}>
+          {error}
+        </div>
+      )}
     </div>
   )
 }

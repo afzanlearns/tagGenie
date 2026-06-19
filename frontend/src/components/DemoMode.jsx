@@ -28,7 +28,7 @@ const STAGES = [
   { key: 'weights', label: 'Weight Shift' },
 ]
 
-export default function DemoMode({ onDemoScore, onDemoSelect, enabled, onToggle }) {
+export default function DemoMode({ onDemoScore, onDemoSelect, enabled, onToggle, activeNiche = 'gps-telematics' }) {
   const [selectedIdx, setSelectedIdx] = useState(null)
   const [stageIndex, setStageIndex] = useState(-1)
   const [running, setRunning] = useState(false)
@@ -48,7 +48,6 @@ export default function DemoMode({ onDemoScore, onDemoSelect, enabled, onToggle 
   useEffect(() => {
     if (!running || stageIndex < 0) return
 
-    const messages = []
     const advanceStage = () => {
       if (stageIndex >= STAGES.length) {
         setRunning(false)
@@ -59,7 +58,7 @@ export default function DemoMode({ onDemoScore, onDemoSelect, enabled, onToggle 
 
       switch (stage.key) {
         case 'expand':
-          msg = 'Expanding topic with Groq LLM — generating related industry terms, jargon, and adjacent concepts.'
+          msg = `Expanding topic with Groq LLM — generating related industry terms in the ${activeNiche} niche context.`
           break
         case 'score':
           msg = 'Scoring candidate tags against Reach, Competition, and Confidence axes using platform-specific weights.'
@@ -94,6 +93,7 @@ export default function DemoMode({ onDemoScore, onDemoSelect, enabled, onToggle 
                 topic: demo.topic,
                 product: demo.product,
                 platform: demo.platform,
+                niche: activeNiche,
                 include_baseline: true,
               }),
             })
@@ -114,7 +114,7 @@ export default function DemoMode({ onDemoScore, onDemoSelect, enabled, onToggle 
     }
 
     advanceStage()
-  }, [running, stageIndex, selectedIdx])
+  }, [running, stageIndex, selectedIdx, activeNiche])
 
   if (!enabled) return null
 
