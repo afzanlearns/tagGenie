@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { api } from '../api'
 const COMPARISON_TAGS = [
   { tg: 'fleet safety', tgScore: 92, bl: 'fleet', blScore: 45, gap: true },
   { tg: 'predictive maintenance', tgScore: 88, bl: 'safety', blScore: 38, gap: false },
@@ -24,43 +25,40 @@ export default function Landing({ onEnter }) {
   const handleSignup = async () => {
     setSignupMsg('')
     try {
-      const res = await fetch('/api/auth/signup', {
+      const data = await api('/api/auth/signup', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: { email, password },
       })
-      if (res.ok) {
-        const data = await res.json()
-        localStorage.setItem('taggenie_token', data.access_token)
-        setSignupMsg('Account created!')
-        onEnter()
-      } else {
-        const err = await res.json()
-        setSignupMsg(err.detail || 'Signup failed')
-      }
+      localStorage.setItem('taggenie_token', data.access_token)
+      setSignupMsg('Account created!')
+      onEnter()
     } catch (e) {
-      setSignupMsg(`Error: ${e.message}`)
+      setSignupMsg(e.message)
     }
   }
 
   const handleLogin = async () => {
     setSignupMsg('')
     try {
-      const res = await fetch('/api/auth/login', {
+      const data = await api('/api/auth/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: { email, password },
       })
-      if (res.ok) {
-        const data = await res.json()
-        localStorage.setItem('taggenie_token', data.access_token)
-        onEnter()
-      } else {
-        const err = await res.json()
-        setSignupMsg(err.detail || 'Login failed')
-      }
+      localStorage.setItem('taggenie_token', data.access_token)
+      onEnter()
     } catch (e) {
-      setSignupMsg(`Error: ${e.message}`)
+      setSignupMsg(e.message)
+    }
+  }
+
+  const handleGuestMode = async () => {
+    try {
+      const data = await api('/api/auth/guest')
+      localStorage.setItem('taggenie_token', data.access_token)
+      localStorage.setItem('taggenie_guest', 'true')
+      onEnter()
+    } catch (e) {
+      setSignupMsg(`Guest mode unavailable: ${e.message}`)
     }
   }
 
@@ -215,7 +213,7 @@ export default function Landing({ onEnter }) {
                 TRY TAGGENIE
               </button>
               <button
-                onClick={onEnter}
+                onClick={handleGuestMode}
                 className="px-8 py-3 text-sm font-medium ml-3"
                 style={{
                   backgroundColor: 'transparent',
@@ -224,7 +222,7 @@ export default function Landing({ onEnter }) {
                   cursor: 'pointer',
                 }}
               >
-                SKIP TO DASHBOARD
+                TRY AS GUEST
               </button>
             </div>
           ) : (

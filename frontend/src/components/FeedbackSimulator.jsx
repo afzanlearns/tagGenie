@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { api } from '../api'
 
 export default function FeedbackSimulator({ tags, platform, niche = 'gps-telematics' }) {
   const [feedbackSent, setFeedbackSent] = useState(false)
@@ -14,25 +15,20 @@ export default function FeedbackSimulator({ tags, platform, niche = 'gps-telemat
     }
 
     try {
-      const res = await fetch('/api/feedback', {
+      await api('/api/feedback', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           post_id: `sim_${Date.now()}`,
           platform,
           niche,
           tags_used: selectedTags,
           engagement,
-        }),
+        },
       })
-      if (res.ok) {
-        setFeedbackSent(true)
-        setMessage(
-          `Simulated post with tags [${selectedTags.join(', ')}] — Likes: ${engagement.likes}, Shares: ${engagement.shares}, Comments: ${engagement.comments}`
-        )
-      } else {
-        setMessage(`Error: ${res.status}`)
-      }
+      setFeedbackSent(true)
+      setMessage(
+        `Simulated post with tags [${selectedTags.join(', ')}] — Likes: ${engagement.likes}, Shares: ${engagement.shares}, Comments: ${engagement.comments}`
+      )
     } catch (e) {
       setMessage(`Error: ${e.message}`)
     }

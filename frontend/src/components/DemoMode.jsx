@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { api } from '../api'
 
 const DEMO_TOPICS = [
   {
@@ -86,18 +87,16 @@ export default function DemoMode({ onDemoScore, onDemoSelect, enabled, onToggle,
         const timer = setTimeout(async () => {
           try {
             const demo = DEMO_TOPICS[selectedIdx]
-            const res = await fetch('/api/score', {
+            const data = await api('/api/score', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
+              body: {
                 topic: demo.topic,
                 product: demo.product,
                 platform: demo.platform,
                 niche: activeNiche,
                 include_baseline: true,
-              }),
+              },
             })
-            const data = await res.json()
             setResults(data)
           } catch (e) {
             setStageMessages(prev => [...prev, { label: 'ERROR', msg: e.message }])

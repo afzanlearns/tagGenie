@@ -2,11 +2,12 @@ import React, { useState } from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
 import Landing from './pages/Landing'
+import { isAuthenticated, isGuest } from './api'
 import './styles/tokens.css'
 
 function Root() {
   const [showDashboard, setShowDashboard] = useState(
-    !!localStorage.getItem('taggenie_token')
+    isAuthenticated() || isGuest()
   )
 
   if (!showDashboard) {
@@ -15,6 +16,7 @@ function Root() {
 
   return <App onLogout={() => {
     localStorage.removeItem('taggenie_token')
+    localStorage.removeItem('taggenie_guest')
     setShowDashboard(false)
   }} />
 }
