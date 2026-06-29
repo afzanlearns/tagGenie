@@ -1,0 +1,34 @@
+{
+  "LinkedIn:hashtag": {
+    "alpha": 92.0,
+    "beta": 85.0
+  },
+  "LinkedIn:keyword": {
+    "alpha": 137.0,
+    "beta": 2.0
+  },
+  "Instagram:hashtag": {
+    "alpha": 92.0,
+    "beta": 60.0
+  },
+  "Instagram:keyword": {
+    "alpha": 137.0,
+    "beta": 3.0
+  },
+  "X:hashtag": {
+    "alpha": 92.0,
+    "beta": 54.0
+  },
+  "X:keyword": {
+    "alpha": 137.0,
+    "beta": 2.0
+  },
+  "TikTok:hashtag": {
+    "alpha": 92.0,
+    "beta": 54.0
+  },
+  "TikTok:keyword": {
+    "alpha": 137.0,
+    "beta": 2.0
+  }
+}

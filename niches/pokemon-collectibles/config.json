@@ -1,0 +1,19 @@
+{
+  "niche_id": "pokemon-collectibles",
+  "display_name": "Pokemon Collectibles & TCG",
+  "description": "The Pok\u00e9mon Collectibles & TCG industry encompasses the trade and collection of Pok\u00e9mon-related items, including trading cards, plush toys, and other merchandise.",
+  "default_platforms": [
+    "LinkedIn",
+    "Instagram",
+    "X",
+    "TikTok"
+  ],
+  "sample_topics": [
+    "Pok\u00e9mon TCG starter decks",
+    "Rare Pok\u00e9mon card prices",
+    "Pok\u00e9mon collectible figurines",
+    "TCG tournament strategies",
+    "Pok\u00e9mon booster box reviews"
+  ],
+  "created_at": "2026-06-19T00:00:00Z"
+}

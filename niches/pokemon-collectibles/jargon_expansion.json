@@ -1,0 +1,61 @@
+{
+  "industry_terms": {
+    "products": [
+      "Booster boxes",
+      "Trading cards",
+      "Plush toys",
+      "Premium collection boxes",
+      "Sleeves",
+      "Deck boxes",
+      "Binders",
+      "Card singles"
+    ],
+    "services": [
+      "TCG tournaments",
+      "Card grading",
+      "Collection appraisals",
+      "Card storage solutions",
+      "Deck building"
+    ],
+    "stakeholders": [
+      "Trainers",
+      "Collectors",
+      "Card shops",
+      "Online retailers",
+      "TCG communities"
+    ],
+    "pain_points": [
+      "Card rarity",
+      "Condition issues",
+      "Counterfeits",
+      "Storage and organization",
+      "Finding rare cards"
+    ],
+    "metrics": [
+      "Card value",
+      "Rarity",
+      "Condition",
+      "Popularity",
+      "Scarcity"
+    ]
+  },
+  "abbreviations": {
+    "TCG": "Trading Card Game",
+    "PP": "Poke Portal",
+    "PSA": "Professional Sports Authenticator"
+  },
+  "adjacent_industries": [
+    "Gaming",
+    "Toys and Hobbies",
+    "Collectibles",
+    "Entertainment",
+    "E-commerce"
+  ],
+  "trending_concepts": [
+    "Digital collectibles",
+    "Card grading technology",
+    "Online TCG platforms",
+    "Sustainable collectibles",
+    "Influencer marketing"
+  ]
+}
