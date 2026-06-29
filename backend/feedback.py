@@ -24,7 +24,8 @@ def init_db():
             comments INTEGER DEFAULT 0,
             posted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             niche TEXT DEFAULT 'gps-telematics',
-            source TEXT DEFAULT 'synthetic'
+            source TEXT DEFAULT 'synthetic',
+            user_id TEXT DEFAULT ''
         )
     """)
     conn.commit()
@@ -33,22 +34,44 @@ def init_db():
 
 def log_feedback(post_id: str, platform: str, tags_used: list[str],
                  likes: int, shares: int, comments: int,
-                 niche: str = "gps-telematics", source: str = "synthetic"):
+                 niche: str = "gps-telematics", source: str = "synthetic",
+                 user_id: str = None):
+    if user_id and user_id.startswith("guest_"):
+        from backend.guest_store import log_feedback as _guest_log
+        _guest_log(user_id, {
+            "post_id": post_id, "platform": platform, "tags_used": tags_used,
+            "likes": likes, "shares": shares, "comments": comments,
+            "niche": niche, "source": source, "user_id": user_id,
+        })
+        return
+
     conn = _get_conn()
     conn.execute(
         """INSERT OR REPLACE INTO post_feedback 
-           (post_id, platform, tags_used, likes, shares, comments, posted_at, niche, source) 
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+           (post_id, platform, tags_used, likes, shares, comments, posted_at, niche, source, user_id) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (post_id, platform, json.dumps(tags_used), likes, shares, comments,
-         datetime.utcnow().isoformat(), niche, source),
+         datetime.utcnow().isoformat(), niche, source, user_id or ""),
     )
     conn.commit()
     conn.close()
 
 
-def get_platform_stats(platform: str, niche: str = None) -> dict:
+def get_platform_stats(platform: str, niche: str = None, user_id: str = None) -> dict:
+    if user_id and user_id.startswith("guest_"):
+        from backend.guest_store import get_feedback as _guest_feedback
+        guest_rows = _guest_feedback(user_id)
+        guest_platform = [r for r in guest_rows if r.get("platform") == platform]
+        guest_platform = [r for r in guest_platform if not niche or r.get("niche") == niche]
+        return _compute_stats(platform, guest_platform)
+
     conn = _get_conn()
-    if niche:
+    if niche and user_id:
+        rows = conn.execute(
+            "SELECT tags_used, likes, shares, comments FROM post_feedback WHERE platform = ? AND niche = ? AND user_id = ?",
+            (platform, niche, user_id),
+        ).fetchall()
+    elif niche:
         rows = conn.execute(
             "SELECT tags_used, likes, shares, comments FROM post_feedback WHERE platform = ? AND niche = ?",
             (platform, niche),
@@ -59,6 +82,11 @@ def get_platform_stats(platform: str, niche: str = None) -> dict:
             (platform,),
         ).fetchall()
     conn.close()
+
+    return _compute_stats(platform, [dict(r) for r in rows])
+
+
+def _compute_stats(platform: str, rows: list[dict]) -> dict:
 
     tag_engagement = {}
     total_engagement = 0
@@ -143,22 +171,32 @@ def seed_synthetic_feedback():
         synthetic_posts.append((
             f"synth_{i}", platform, json.dumps(tags),
             likes, shares, comments, post_time.isoformat(),
-            "gps-telematics", "synthetic",
+            "gps-telematics", "synthetic", "",
         ))
 
     conn.executemany(
-        "INSERT INTO post_feedback (post_id, platform, tags_used, likes, shares, comments, posted_at, niche, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO post_feedback (post_id, platform, tags_used, likes, shares, comments, posted_at, niche, source, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         synthetic_posts,
     )
     conn.commit()
     conn.close()
 
 
-def get_feedback_by_niche(niche: str) -> list[dict]:
+def get_feedback_by_niche(niche: str, user_id: str = None) -> list[dict]:
+    if user_id and user_id.startswith("guest_"):
+        from backend.guest_store import get_feedback as _guest_feedback
+        return [r for r in _guest_feedback(user_id) if r.get("niche") == niche]
+
     conn = _get_conn()
-    rows = conn.execute(
-        "SELECT * FROM post_feedback WHERE niche = ? ORDER BY posted_at DESC",
-        (niche,),
-    ).fetchall()
+    if user_id:
+        rows = conn.execute(
+            "SELECT * FROM post_feedback WHERE niche = ? AND user_id = ? ORDER BY posted_at DESC",
+            (niche, user_id),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT * FROM post_feedback WHERE niche = ? ORDER BY posted_at DESC",
+            (niche,),
+        ).fetchall()
     conn.close()
     return [dict(r) for r in rows]

@@ -5,9 +5,12 @@ import json
 import hashlib
 import secrets
 import sqlite3
+import uuid
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
+from fastapi import Depends, HTTPException
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 load_dotenv(Path(__file__).parent / ".env")
 
@@ -21,6 +24,11 @@ DB_PATH = DATA_DIR / "auth.db"
 SECRET_KEY = os.getenv("JWT_SECRET_KEY", "taggenie-dev-secret-do-not-use-in-prod")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_HOURS = 24
+
+# In-memory guest session store: maps session_id -> user_data
+_guest_sessions: dict[str, dict] = {}
+
+GUEST_SESSION_PREFIX = "gst_"
 
 
 def init_auth_db():
@@ -205,3 +213,70 @@ def get_user_by_api_key(api_key: str) -> dict:
         return {"user_id": row[0], "email": row[1], "usage_count": row[2]}
     finally:
         conn.close()
+
+
+# ── Guest sessions ──────────────────────────────────────────────────────────
+
+def create_guest_session() -> dict:
+    """Create an in-memory guest session. Returns guest user data + session_id."""
+    session_id = GUEST_SESSION_PREFIX + uuid.uuid4().hex[:16]
+    _guest_sessions[session_id] = {
+        "session_id": session_id,
+        "is_guest": True,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    return _guest_sessions[session_id]
+
+
+def get_guest_session(session_id: str):
+    """Look up a guest session by session_id."""
+    return _guest_sessions.get(session_id)
+
+
+def delete_guest_session(session_id: str):
+    _guest_sessions.pop(session_id, None)
+
+
+# ── Auth helpers ────────────────────────────────────────────────────────────
+
+def _resolve_user(credentials):
+    """Internal: resolve credentials to a user dict, or raise HTTPException."""
+    if credentials is None:
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication required. Provide a Bearer token or use guest mode.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    token = credentials.credentials
+
+    if token.startswith(GUEST_SESSION_PREFIX):
+        session = get_guest_session(token)
+        if session is None:
+            raise HTTPException(status_code=401, detail="Invalid or expired guest session.")
+        return {"user_id": token, "email": f"guest@{token[:8]}", "is_guest": True}
+
+    if jwt is None:
+        raise HTTPException(status_code=500, detail="PyJWT is required for authentication")
+    try:
+        payload = verify_token(token)
+        return {"user_id": int(payload["sub"]), "email": payload.get("email"), "is_guest": False}
+    except ValueError as e:
+        raise HTTPException(status_code=401, detail=str(e))
+
+
+# ── FastAPI dependencies ────────────────────────────────────────────────────
+
+def require_user(credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer(auto_error=False))):
+    """FastAPI dependency: return the authenticated user or raise 401."""
+    return _resolve_user(credentials)
+
+
+def get_optional_user(credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer(auto_error=False))):
+    """FastAPI dependency: return user if authenticated, else None (no error)."""
+    if credentials is None:
+        return None
+    try:
+        return _resolve_user(credentials)
+    except HTTPException:
+        return None

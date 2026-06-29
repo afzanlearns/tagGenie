@@ -20,6 +20,14 @@ from backend import scoring
 DATA_DIR = Path(__file__).parent.parent / "data"
 BETA_FILE = DATA_DIR / "beta_params.json"
 
+
+def _get_beta_path(user_id: str = None) -> Path:
+    if user_id and not user_id.startswith("guest_"):
+        user_dir = DATA_DIR / "users" / str(user_id)
+        user_dir.mkdir(parents=True, exist_ok=True)
+        return user_dir / "beta_params.json"
+    return BETA_FILE
+
 _scheduler = None
 
 # Default Beta parameters: Beta(alpha=2, beta=2) is uniform-ish on [0,1]
@@ -40,17 +48,26 @@ PLATFORM_TAG_TYPES = [
 ]
 
 
-def _load_beta_params() -> dict:
-    """Load Beta distribution parameters from disk."""
-    if BETA_FILE.exists():
-        with open(BETA_FILE) as f:
+def _load_beta_params(user_id: str = None) -> dict:
+    """Load Beta distribution parameters for a user."""
+    if user_id and user_id.startswith("guest_"):
+        from backend.guest_store import get_beta_params
+        return get_beta_params(user_id)
+    path = _get_beta_path(user_id)
+    if path.exists():
+        with open(path) as f:
             return json.load(f)
     return {}
 
 
-def _save_beta_params(params: dict):
-    """Save Beta distribution parameters to disk."""
-    with open(BETA_FILE, "w") as f:
+def _save_beta_params(params: dict, user_id: str = None):
+    """Save Beta distribution parameters for a user."""
+    if user_id and user_id.startswith("guest_"):
+        from backend.guest_store import save_beta_params
+        save_beta_params(user_id, params)
+        return
+    path = _get_beta_path(user_id)
+    with open(path, "w") as f:
         json.dump(params, f, indent=2)
 
 
@@ -72,7 +89,7 @@ def _sample_from_beta(alpha: float, beta: float) -> float:
         return 0.5  # Fallback to midpoint
 
 
-def _thompson_recompute():
+def _thompson_recompute(user_id: str = None):
     """Nightly job using Thompson Sampling for principled weight learning.
 
     For each platform/tag-type combination:
@@ -82,10 +99,10 @@ def _thompson_recompute():
     4. Sample from the updated Beta distribution to set the live weight
     5. Scale the [0,1] sample to [0.1, 2.0] range
     """
-    beta_params = _load_beta_params()
+    beta_params = _load_beta_params(user_id)
 
     for platform in ["LinkedIn", "Instagram", "X", "TikTok"]:
-        stats = feedback.get_platform_stats(platform)
+        stats = feedback.get_platform_stats(platform, user_id=user_id)
         if stats["post_count"] == 0:
             continue
 
@@ -132,8 +149,8 @@ def _thompson_recompute():
             blended = max(0.1, min(2.0, blended))
             scoring.PLATFORM_WEIGHTS[platform][tag_type] = blended
 
-    _save_beta_params(beta_params)
-    scoring.save_weights()
+    _save_beta_params(beta_params, user_id)
+    scoring.save_weights(user_id)
 
 
 def _heuristic_recompute():
@@ -183,10 +200,10 @@ def shutdown_scheduler():
         _scheduler = None
 
 
-def trigger_recompute():
-    _thompson_recompute()
+def trigger_recompute(user_id: str = None):
+    _thompson_recompute(user_id)
 
 
-def get_beta_summary() -> dict:
+def get_beta_summary(user_id: str = None) -> dict:
     """Return current Beta distribution parameters for inspection."""
-    return _load_beta_params()
+    return _load_beta_params(user_id)

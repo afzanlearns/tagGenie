@@ -1,75 +1,80 @@
-from keybert import KeyBERT
-import spacy
-import json
-from pathlib import Path
-from backend.llm import expand_topic
-from backend.niche_manager import get_active_niche
+"""Candidate extraction using stored niche vocabulary profiles.
 
-_ke_model = None
-_nlp = None
+No KeyBERT. No LLM prose generation.
+Every candidate comes from the niche's structured vocabulary profile,
+matched semantically to the user's topic/product query.
+"""
 
+import numpy as np
+from sentence_transformers import SentenceTransformer
+from backend.niche_manager import get_niche_profile, get_active_niche
+from backend.candidate_filter import filter_candidates, semantic_confidence, normalize_term, is_valid_candidate
 
-def _get_ke():
-    global _ke_model
-    if _ke_model is None:
-        _ke_model = KeyBERT()
-    return _ke_model
+_sim_model = None
 
 
-def _get_nlp():
-    global _nlp
-    if _nlp is None:
-        _nlp = spacy.load("en_core_web_sm")
-    return _nlp
+def _get_sim_model():
+    global _sim_model
+    if _sim_model is None:
+        _sim_model = SentenceTransformer("all-MiniLM-L6-v2")
+    return _sim_model
 
 
-def extract_hashtags(text: str, top_n: int = 15) -> list[str]:
-    kw_model = _get_ke()
-    keywords = kw_model.extract_keywords(
-        text,
-        keyphrase_ngram_range=(1, 3),
-        stop_words="english",
-        top_n=top_n,
-        use_mmr=True,
-        diversity=0.4,
-    )
-    tags = []
-    seen = set()
-    for kw, _ in keywords:
-        tag = kw.strip().lower()
-        if tag not in seen and len(tag) > 2:
-            seen.add(tag)
-            tags.append(tag)
-    return tags
-
-
-def extract_candidates(topic: str, product: str, niche_id: str = None) -> list[dict]:
+def extract_candidates(topic: str, product: str, niche_id: str = None,
+                       user_id: str = None) -> list[dict]:
     if niche_id is None:
-        niche_id = get_active_niche()
+        niche_id = get_active_niche(user_id)
 
-    expanded = expand_topic(topic, product, niche_id)
-    if not expanded or not expanded.strip():
-        expanded = f"{topic} {product}"
+    profile = get_niche_profile(niche_id, user_id)
 
-    raw_keywords = extract_hashtags(expanded, top_n=25)
-    if not raw_keywords:
-        raw_keywords = [w.strip() for w in f"{topic} {product}".lower().split() if len(w.strip()) > 2]
+    all_vocab = []
+    if profile:
+        for cat in ["industry_terms", "products", "topics", "hashtags", "brands", "audience"]:
+            all_vocab.extend(profile.get(cat, []))
 
-    nlp = _get_nlp()
-    doc = nlp(expanded)
+        synonyms = profile.get("synonyms", {})
+        for key, syn_list in synonyms.items():
+            all_vocab.append(key)
+            all_vocab.extend(syn_list)
 
-    candidates = []
-    seen = set()
-    for kw in raw_keywords:
-        if kw not in seen:
-            seen.add(kw)
-            tag_type = "hashtag" if len(kw.split()) <= 2 else "keyword"
-            candidates.append({"tag": kw, "type": tag_type})
+        all_vocab = list(dict.fromkeys(all_vocab))
 
-    for chunk in doc.noun_chunks:
-        phrase = chunk.text.strip().lower()
-        if len(phrase.split()) >= 2 and phrase not in seen:
-            seen.add(phrase)
-            candidates.append({"tag": phrase, "type": "keyword"})
+    combined_query = f"{topic} {product}"
 
-    return candidates[:25]
+    if all_vocab and len(all_vocab) >= 3:
+        model = _get_sim_model()
+        emb_vocab = model.encode(all_vocab)
+        emb_query = model.encode([combined_query])
+        scores = np.dot(emb_vocab, emb_query.T).flatten()
+        top_indices = np.argsort(scores)[::-1][:40]
+        threshold = 0.25
+        scored_terms = []
+        for idx in top_indices:
+            if scores[idx] >= threshold:
+                term = all_vocab[idx].strip().lower()
+                conf = round(float(scores[idx] * 100.0), 1)
+                if is_valid_candidate(term, topic, product, min_confidence=30.0):
+                    tag_type = "hashtag" if len(term.split()) <= 2 else "keyword"
+                    scored_terms.append({"tag": term, "type": tag_type, "confidence": conf})
+
+        if scored_terms:
+            scored_terms.sort(key=lambda x: x["confidence"], reverse=True)
+            return scored_terms[:25]
+
+    fallback_terms = _generate_fallback_terms(topic, product)
+    filtered = filter_candidates(fallback_terms, topic, product, min_confidence=25.0)
+    return [
+        {"tag": t, "type": "hashtag" if len(t.split()) <= 2 else "keyword", "confidence": 50.0}
+        for t in filtered[:15]
+    ]
+
+
+def _generate_fallback_terms(topic: str, product: str) -> list[str]:
+    terms = []
+    words = f"{topic} {product}".lower().split()
+    for i in range(len(words)):
+        for j in range(i + 1, min(i + 4, len(words) + 1)):
+            phrase = " ".join(words[i:j])
+            if len(phrase) > 2:
+                terms.append(phrase)
+    return terms

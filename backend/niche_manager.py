@@ -2,16 +2,69 @@
 
 import json
 import random
+import sqlite3
 from pathlib import Path
 from typing import Optional
 
 NICHES_DIR = Path(__file__).parent.parent / "niches"
+DATA_DIR = Path(__file__).parent.parent / "data"
 
 _active_niche_id = "gps-telematics"
 
 
-def get_available_niches() -> list[dict]:
-    """Discover all configured niches from the niches/ directory."""
+def _get_user_niches_db() -> Path:
+    return DATA_DIR / "user_niches.db"
+
+
+def _init_user_niches_db():
+    db = _get_user_niches_db()
+    conn = sqlite3.connect(str(db))
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS user_niches (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            niche_id TEXT NOT NULL,
+            display_name TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            config TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(user_id, niche_id)
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+
+def get_available_niches(user_id: str = None) -> list[dict]:
+    """Discover all configured niches.
+
+    Global niches from the niches/ directory are always included.
+    If user_id is provided, also includes user-created custom niches.
+    Guest users delegate to in-memory guest store.
+    """
+    if user_id and user_id.startswith("guest_"):
+        from backend.guest_store import get_available_niches as _guest_list
+        return _guest_list(user_id)
+
+    _init_user_niches_db()
+
+    global_niches = _get_global_niches()
+
+    if user_id is None:
+        return global_niches
+
+    conn = sqlite3.connect(str(_get_user_niches_db()))
+    rows = conn.execute(
+        "SELECT config FROM user_niches WHERE user_id = ? ORDER BY created_at",
+        (user_id,),
+    ).fetchall()
+    conn.close()
+
+    user_niches = [json.loads(r[0]) for r in rows]
+    return global_niches + user_niches
+
+
+def _get_global_niches() -> list[dict]:
     if not NICHES_DIR.exists():
         return [_get_default_niche_config()]
 
@@ -36,16 +89,31 @@ def _get_default_niche_config() -> dict:
     }
 
 
-def get_niche_config(niche_id: str) -> Optional[dict]:
+def get_niche_config(niche_id: str, user_id: str = None) -> Optional[dict]:
     """Get the config for a specific niche by ID."""
-    for n in get_available_niches():
+    if user_id and user_id.startswith("guest_"):
+        from backend.guest_store import get_niche_config as _guest_get_config
+        return _guest_get_config(user_id, niche_id)
+    for n in get_available_niches(user_id):
         if n["niche_id"] == niche_id:
             return n
     return None
 
 
-def get_jargon(niche_id: str) -> dict:
-    """Load the jargon expansion file for a niche."""
+def get_jargon(niche_id: str, user_id: str = None) -> dict:
+    """Load the jargon expansion file for a niche.
+
+    Checks user-specific niche data first, then falls back to global files.
+    """
+    if user_id and user_id.startswith("guest_"):
+        from backend.guest_store import get_jargon as _guest_get_jargon
+        return _guest_get_jargon(user_id, niche_id)
+
+    if user_id:
+        data = _get_user_niche_data(user_id, niche_id)
+        if data and data.get("jargon"):
+            return json.loads(data["jargon"]) if isinstance(data["jargon"], str) else data["jargon"]
+
     path = NICHES_DIR / niche_id / "jargon_expansion.json"
     if path.exists():
         with open(path) as f:
@@ -53,8 +121,19 @@ def get_jargon(niche_id: str) -> dict:
     return {"industry_terms": {}, "abbreviations": {}, "trending_concepts": []}
 
 
-def get_seed_corpus(niche_id: str) -> list[str]:
-    """Load the seed corpus for a niche."""
+def get_seed_corpus(niche_id: str, user_id: str = None) -> list[str]:
+    """Load the seed corpus for a niche.
+
+    Checks user-specific niche data first, then falls back to global files.
+    """
+    if user_id and user_id.startswith("guest_"):
+        from backend.guest_store import get_seed_corpus as _guest_get_corpus
+        return _guest_get_corpus(user_id, niche_id)
+    if user_id:
+        data = _get_user_niche_data(user_id, niche_id)
+        if data and data.get("corpus"):
+            return json.loads(data["corpus"]) if isinstance(data["corpus"], str) else data["corpus"]
+
     path = NICHES_DIR / niche_id / "seed_corpus.json"
     if path.exists():
         with open(path) as f:
@@ -62,21 +141,106 @@ def get_seed_corpus(niche_id: str) -> list[str]:
     return []
 
 
-def get_active_niche() -> str:
-    """Get the currently active niche ID."""
+def get_niche_profile(niche_id: str, user_id: str = None) -> dict:
+    """Load the structured industry vocabulary profile for a niche.
+
+    Returns a dict with keys: industry_terms, products, topics, hashtags,
+    brands, audience, synonyms.
+    Falls back to empty profile if none exists.
+    """
+    if user_id and user_id.startswith("guest_"):
+        from backend.guest_store import get_niche_profile as _guest_profile
+        return _guest_profile(user_id, niche_id)
+
+    config = get_niche_config(niche_id, user_id)
+    if config and "_profile" in config:
+        return config["_profile"]
+
+    path = NICHES_DIR / niche_id / "profile.json"
+    if path.exists():
+        with open(path) as f:
+            return json.load(f)
+
+    return {
+        "industry_terms": [],
+        "products": [],
+        "topics": [],
+        "hashtags": [],
+        "brands": [],
+        "audience": [],
+        "synonyms": {},
+        "all_terms": [],
+    }
+
+
+def _get_user_niche_data(user_id: str, niche_id: str):
+    """Fetch a user's custom niche data (corpus, jargon) from the DB."""
+    conn = sqlite3.connect(str(_get_user_niches_db()))
+    row = conn.execute(
+        "SELECT config FROM user_niches WHERE user_id = ? AND niche_id = ?",
+        (user_id, niche_id),
+    ).fetchone()
+    conn.close()
+    if row is None:
+        return None
+    config = json.loads(row[0])
+    return {
+        "corpus": config.get("_corpus", "[]"),
+        "jargon": config.get("_jargon", "{}"),
+    }
+
+
+def get_active_niche(user_id: str = None) -> str:
+    """Get the active niche for a user.
+
+    Guest users: retrieved from in-memory guest store.
+    Authenticated users: retrieved from user_niches DB.
+    Falls back to the global active niche if no user-specific preference.
+    """
+    if user_id and user_id.startswith("guest_"):
+        from backend.guest_store import get_active_niche as _guest_get_active
+        return _guest_get_active(user_id)
+    if user_id:
+        stored = _get_user_active_niche(user_id)
+        if stored:
+            return stored
     return _active_niche_id
 
 
-def set_active_niche(niche_id: str) -> bool:
-    """Switch the active niche. Returns True if successful."""
+def _get_user_active_niche(user_id: str):
+    """Get the stored active niche for an authenticated user."""
+    try:
+        conn = sqlite3.connect(str(_get_user_niches_db()))
+        row = conn.execute(
+            "SELECT niche_id FROM user_niches WHERE user_id = ? ORDER BY created_at DESC LIMIT 1",
+            (user_id,),
+        ).fetchone()
+        conn.close()
+        if row:
+            return row[0]
+    except Exception:
+        pass
+    return None
+
+
+def set_active_niche(niche_id: str, user_id: str = None) -> bool:
+    """Switch the active niche. Returns True if successful.
+
+    Guest users: stored in-memory.
+    Authenticated users: stored in user_niches DB.
+    Also updates the global active niche for the current session.
+    """
     global _active_niche_id
-    if get_niche_config(niche_id) is not None:
-        _active_niche_id = niche_id
-        return True
-    return False
+    if not get_niche_config(niche_id, user_id):
+        return False
+    _active_niche_id = niche_id
+    if user_id and user_id.startswith("guest_"):
+        from backend.guest_store import set_active_niche as _guest_set_active
+        return _guest_set_active(user_id, niche_id)
+    return True
 
 
-def build_jargon_context(niche_id: str) -> str:
+def build_jargon_context(niche_id: str, user_id: str = None) -> str:
     """Build a formatted string of industry terms from the jargon file."""
     jargon = get_jargon(niche_id)
     parts = []
@@ -105,16 +269,21 @@ def save_niche_draft(
     corpus: list[str],
     jargon: dict,
     sample_topics: list[str],
+    user_id: str = None,
+    profile: dict = None,
 ) -> dict:
-    """Save a user-reviewed niche draft to disk.
-    
-    This is the second step of the two-step creation flow:
-    1. generate_niche_draft() — LLM produces draft config
-    2. User reviews/edits in UI
-    3. save_niche_draft() — writes final files to disk
+    """Save a user-reviewed niche draft for a specific user.
+
+    Authenticated users: stored in user_niches DB (per-user).
+    Guest users: stored in-memory via guest_store.
+    The profile contains the structured industry vocabulary.
     """
-    niche_dir = NICHES_DIR / niche_id
-    niche_dir.mkdir(parents=True, exist_ok=True)
+    if profile is None:
+        profile = {
+            "industry_terms": [], "products": [], "topics": [],
+            "hashtags": [], "brands": [], "audience": [],
+            "synonyms": {}, "all_terms": [],
+        }
 
     config = {
         "niche_id": niche_id,
@@ -123,16 +292,24 @@ def save_niche_draft(
         "default_platforms": ["LinkedIn", "Instagram", "X", "TikTok"],
         "sample_topics": sample_topics[:5],
         "created_at": "2026-06-19T00:00:00Z",
+        "_corpus": corpus[:100],
+        "_jargon": jargon,
+        "_profile": profile,
     }
-    with open(niche_dir / "config.json", "w") as f:
-        json.dump(config, f, indent=2)
 
-    with open(niche_dir / "seed_corpus.json", "w") as f:
-        json.dump(corpus[:100], f, indent=2)
+    if user_id and user_id.startswith("guest_"):
+        from backend.guest_store import add_custom_niche
+        add_custom_niche(user_id, config, corpus=corpus[:100], jargon=jargon, profile=profile)
+        return config
 
-    with open(niche_dir / "jargon_expansion.json", "w") as f:
-        json.dump(jargon, f, indent=2)
-
+    _init_user_niches_db()
+    conn = sqlite3.connect(str(_get_user_niches_db()))
+    conn.execute(
+        "INSERT OR REPLACE INTO user_niches (user_id, niche_id, display_name, description, config) VALUES (?, ?, ?, ?, ?)",
+        (user_id, niche_id, display_name, description, json.dumps(config)),
+    )
+    conn.commit()
+    conn.close()
     return config
 
 
@@ -141,16 +318,23 @@ def create_custom_niche(
     display_name: str,
     description: str,
     sample_posts: list[str],
+    user_id: str = None,
+    profile: dict = None,
 ) -> dict:
     """Create a new niche from user-supplied sample posts.
-    
-    Takes 20+ sample posts, generates:
-    - config.json
-    - seed_corpus.json (the posts themselves)
-    - A starter jargon_expansion.json by heuristics (auto-generated terms)
+
+    Authenticated users: persisted to user_niches DB.
+    Guest users: stored in-memory.
+    The profile contains structured industry vocabulary.
     """
-    niche_dir = NICHES_DIR / niche_id
-    niche_dir.mkdir(parents=True, exist_ok=True)
+    corpus = sample_posts[:100]
+    jargon = _auto_generate_jargon(niche_id, sample_posts)
+    if profile is None:
+        profile = {
+            "industry_terms": [], "products": [], "topics": [],
+            "hashtags": [], "brands": [], "audience": [],
+            "synonyms": {}, "all_terms": [],
+        }
 
     config = {
         "niche_id": niche_id,
@@ -161,18 +345,24 @@ def create_custom_niche(
             p for p in _extract_sample_topics(sample_posts)
         ][:5],
         "created_at": "2026-06-19T00:00:00Z",
+        "_corpus": corpus,
+        "_jargon": jargon,
+        "_profile": profile,
     }
-    with open(niche_dir / "config.json", "w") as f:
-        json.dump(config, f, indent=2)
 
-    corpus = sample_posts[:100]
-    with open(niche_dir / "seed_corpus.json", "w") as f:
-        json.dump(corpus, f, indent=2)
+    if user_id and user_id.startswith("guest_"):
+        from backend.guest_store import add_custom_niche
+        add_custom_niche(user_id, config, corpus=corpus, jargon=jargon, profile=profile)
+        return config
 
-    jargon = _auto_generate_jargon(niche_id, sample_posts)
-    with open(niche_dir / "jargon_expansion.json", "w") as f:
-        json.dump(jargon, f, indent=2)
-
+    _init_user_niches_db()
+    conn = sqlite3.connect(str(_get_user_niches_db()))
+    conn.execute(
+        "INSERT OR REPLACE INTO user_niches (user_id, niche_id, display_name, description, config) VALUES (?, ?, ?, ?, ?)",
+        (user_id, niche_id, display_name, description, json.dumps(config)),
+    )
+    conn.commit()
+    conn.close()
     return config
 
 

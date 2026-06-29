@@ -16,18 +16,22 @@ class ScoreRequest(BaseModel):
 class CandidateTag(BaseModel):
     tag: str
     type: Literal["hashtag", "keyword"]
-    reach_score: float
-    competition_score: float
-    final_score: float
-    confidence: float
-    rationale: str = ""
+    semantic_relevance: float = 0.0
+    trend_score: float = 0.0
+    competition_score: float = 0.0
+    platform_fit: float = 0.0
+    history_confidence: float = 0.0
+    final_score: float = 0.0
+    explanation: str = ""
+    category: str = ""
 
 
 class GapTag(BaseModel):
     tag: str
     type: Literal["hashtag", "keyword"]
-    reach_score: float
-    competition_score: float
+    semantic_relevance: float = 0.0
+    trend_score: float = 0.0
+    competition_score: float = 0.0
     reason: str
 
 
@@ -35,6 +39,7 @@ class BaselineTag(BaseModel):
     tag: str
     type: Literal["hashtag", "keyword"]
     score: float
+    semantic_relevance: float = 0.0
 
 
 class ScoreResponse(BaseModel):
@@ -93,6 +98,17 @@ class SaveNicheDraftRequest(BaseModel):
     corpus: list[str]
     jargon: dict
     sample_topics: list[str]
+    profile: Optional[dict] = None
+
+
+class NicheProfile(BaseModel):
+    industry_terms: list[str] = []
+    products: list[str] = []
+    topics: list[str] = []
+    hashtags: list[str] = []
+    brands: list[str] = []
+    audience: list[str] = []
+    synonyms: dict[str, list[str]] = {}
 
 
 class SignupRequest(BaseModel):
