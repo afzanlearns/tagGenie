@@ -1,3 +1,5 @@
+import PipelineStages from './PipelineStages'
+
 export default function InputPanel({ topic, setTopic, product, setProduct, platform, setPlatform, platforms, onScore, loading }) {
   return (
     <div className="border p-6" style={{ borderColor: '#1C1C1C' }}>
@@ -66,6 +68,7 @@ export default function InputPanel({ topic, setTopic, product, setProduct, platf
       >
         {loading ? 'SCORING...' : 'GENERATE TAGS'}
       </button>
+      <PipelineStages active={loading} />
     </div>
   )
 }

@@ -5,6 +5,22 @@ import GapFinder from './components/GapFinder'
 import FeedbackSimulator from './components/FeedbackSimulator'
 import ComparisonView from './components/ComparisonView'
 import DemoMode from './components/DemoMode'
+import AnalyticsCards from './components/AnalyticsCards'
+import PlatformComparison from './components/PlatformComparison'
+import RecommendationHistory, { loadHistory, saveEntry, clearHistory } from './components/RecommendationHistory'
+import ExportReport from './components/ExportReport'
+import EmptyState from './components/EmptyState'
+import { api, isGuest } from './api'
+
+function slugify(text) {
+  if (!text) return 'untitled'
+  let s = text.trim().toLowerCase()
+  s = s.normalize('NFKD').replace(/[^\x00-\x7F]/g, '')
+  s = s.replace(/[^a-z0-9_-]/g, '-')
+  s = s.replace(/[-_]+/g, '-')
+  s = s.replace(/^-+|-+$/g, '')
+  return s || 'untitled'
+}
 
 const PLATFORMS = ['LinkedIn', 'Instagram', 'X', 'TikTok']
 
@@ -17,14 +33,14 @@ export default function App({ onLogout }) {
   const [error, setError] = useState(null)
   const [tab, setTab] = useState('results')
   const [demoMode, setDemoMode] = useState(false)
+  const [historyEntries, setHistoryEntries] = useState(loadHistory)
 
   const [niches, setNiches] = useState([])
   const [activeNiche, setActiveNiche] = useState('gps-telematics')
   const [showNichePanel, setShowNichePanel] = useState(false)
 
   useEffect(() => {
-    fetch('/api/niches')
-      .then(r => r.json())
+    api('/api/niches')
       .then(data => {
         setNiches(data.niches || [])
         setActiveNiche(data.active || 'gps-telematics')
@@ -34,15 +50,12 @@ export default function App({ onLogout }) {
 
   const handleNicheSwitch = async (nicheId) => {
     try {
-      const res = await fetch('/api/niches/switch', {
+      await api('/api/niches/switch', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ niche_id: nicheId }),
+        body: { niche_id: nicheId },
       })
-      if (res.ok) {
-        setActiveNiche(nicheId)
-        setResults(null)
-      }
+      setActiveNiche(nicheId)
+      setResults(null)
     } catch (e) {
       console.error(e)
     }
@@ -53,20 +66,26 @@ export default function App({ onLogout }) {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch('/api/score', {
+      const data = await api('/api/score', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           topic: topic.trim(),
           product: product.trim(),
           platform,
           niche: activeNiche,
           include_baseline: true,
-        }),
+        },
       })
-      if (!res.ok) throw new Error(`Server error: ${res.status}`)
-      const data = await res.json()
       setResults(data)
+      const updated = saveEntry({
+        topic: topic.trim(),
+        product: product.trim(),
+        platform,
+        niche: activeNiche,
+        tags: data.ranked_tags?.length || 0,
+      })
+      setHistoryEntries(updated)
+      setTab('results')
     } catch (e) {
       setError(e.message)
     } finally {
@@ -78,6 +97,21 @@ export default function App({ onLogout }) {
     setTopic(demoTopic)
     setProduct(demoProduct)
     setPlatform(demoPlatform)
+  }
+
+  const handleHistoryRestore = (entry) => {
+    setTopic(entry.topic)
+    setProduct(entry.product)
+    setPlatform(entry.platform)
+    if (entry.niche && entry.niche !== activeNiche) {
+      handleNicheSwitch(entry.niche)
+    }
+    setTab('results')
+  }
+
+  const handleClearHistory = () => {
+    clearHistory()
+    setHistoryEntries([])
   }
 
   const currentNicheName = niches.find(n => n.niche_id === activeNiche)?.display_name || activeNiche
@@ -129,6 +163,7 @@ export default function App({ onLogout }) {
               {results.fallback_mode && (
                 <span style={{ color: 'var(--accent)' }}>FALLBACK</span>
               )}
+              <ExportReport results={results} topic={topic} product={product} platform={platform} />
             </div>
           )}
           <div className="flex items-center gap-2">
@@ -144,6 +179,18 @@ export default function App({ onLogout }) {
             >
               {demoMode ? 'DEMO ON' : 'DEMO MODE'}
             </button>
+            {isGuest() && (
+              <span
+                className="text-xs px-2 py-0.5"
+                style={{
+                  backgroundColor: '#222',
+                  color: '#aa6',
+                  border: '1px solid #443',
+                }}
+              >
+                GUEST
+              </span>
+            )}
             {onLogout && (
               <button
                 onClick={onLogout}
@@ -155,7 +202,7 @@ export default function App({ onLogout }) {
                   cursor: 'pointer',
                 }}
               >
-                LOG OUT
+                {isGuest() ? 'LEAVE GUEST MODE' : 'LOG OUT'}
               </button>
             )}
           </div>
@@ -198,8 +245,17 @@ export default function App({ onLogout }) {
           </div>
         )}
 
+        {!results && !loading && !error && (
+          <EmptyState
+            hasHistory={historyEntries.length > 0}
+            onDemoSelect={handleDemoSelect}
+          />
+        )}
+
         {results && (
           <div className="mt-8">
+            <AnalyticsCards results={results} />
+
             <div className="flex gap-0 border-b" style={{ borderColor: '#1C1C1C' }}>
               <button
                 onClick={() => setTab('results')}
@@ -245,6 +301,28 @@ export default function App({ onLogout }) {
               >
                 COMPARISON
               </button>
+              <button
+                onClick={() => setTab('platform')}
+                className={`px-4 py-2 text-xs ${tab === 'platform' ? 'border' : ''}`}
+                style={{
+                  borderColor: tab === 'platform' ? '#333' : 'transparent',
+                  borderBottom: 'none',
+                  color: tab === 'platform' ? 'var(--text)' : '#555',
+                }}
+              >
+                PLATFORMS
+              </button>
+              <button
+                onClick={() => setTab('history')}
+                className={`px-4 py-2 text-xs ${tab === 'history' ? 'border' : ''}`}
+                style={{
+                  borderColor: tab === 'history' ? '#333' : 'transparent',
+                  borderBottom: 'none',
+                  color: tab === 'history' ? 'var(--text)' : '#555',
+                }}
+              >
+                HISTORY ({historyEntries.length})
+              </button>
             </div>
 
             <div className="border border-t-0 p-6" style={{ borderColor: '#1C1C1C' }}>
@@ -252,6 +330,21 @@ export default function App({ onLogout }) {
               {tab === 'gaps' && <GapFinder gaps={results.gap_tags} />}
               {tab === 'feedback' && <FeedbackSimulator tags={results.ranked_tags} platform={platform} niche={activeNiche} />}
               {tab === 'comparison' && <ComparisonView tagGenieTags={results.ranked_tags} baselineTags={results.baseline_tags || []} gapTags={results.gap_tags} />}
+              {tab === 'platform' && (
+                <PlatformComparison
+                  topic={topic}
+                  product={product}
+                  niche={activeNiche}
+                  onSelectTag={(tag) => {}}
+                />
+              )}
+              {tab === 'history' && (
+                <RecommendationHistory
+                  entries={historyEntries}
+                  onRestore={handleHistoryRestore}
+                  onClear={handleClearHistory}
+                />
+              )}
             </div>
           </div>
         )}
@@ -289,20 +382,14 @@ function CustomNichePanel({ onCreated, onClose }) {
     setGenerating(true)
     setError('')
     try {
-      const res = await fetch('/api/niches/generate-draft', {
+      const data = await api('/api/niches/generate-draft', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          niche_id: nicheId.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-'),
+        body: {
+          niche_id: slugify(nicheId),
           display_name: displayName.trim(),
           sample_posts: posts,
-        }),
+        },
       })
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.detail || 'Generation failed')
-      }
-      const data = await res.json()
       const d = data.draft
       setDraft(d)
       setEditCorpus(d.corpus ? d.corpus.join('\n') : '')
@@ -334,24 +421,22 @@ function CustomNichePanel({ onCreated, onClose }) {
     setSaving(true)
     setError('')
     try {
-      const res = await fetch('/api/niches/save-draft', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          niche_id: draft.niche_id,
-          display_name: draft.display_name,
-          description: description.trim(),
-          sample_posts: draft.sample_posts,
-          corpus,
-          jargon,
-          sample_topics: topics,
-        }),
-      })
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.detail || 'Save failed')
+      const body = {
+        niche_id: draft.niche_id,
+        display_name: draft.display_name,
+        description: description.trim(),
+        sample_posts: draft.sample_posts,
+        corpus,
+        jargon,
+        sample_topics: topics,
       }
-      const data = await res.json()
+      if (draft.profile) {
+        body.profile = draft.profile
+      }
+      const data = await api('/api/niches/save-draft', {
+        method: 'POST',
+        body,
+      })
       onCreated(data.niche)
     } catch (e) {
       setError(e.message)
@@ -427,18 +512,9 @@ function CustomNichePanel({ onCreated, onClose }) {
           />
         </div>
 
-        <div className="mb-4">
-          <label className="block text-xs mb-1.5" style={{ color: '#555' }}>
-            JARGON (JSON, editable)
-          </label>
-          <textarea
-            value={editJargon}
-            onChange={e => setEditJargon(e.target.value)}
-            rows={10}
-            className="w-full px-3 py-2 text-sm border focus:outline-none font-mono"
-            style={{ backgroundColor: 'transparent', borderColor: '#333', color: 'var(--text)', resize: 'vertical', fontSize: '11px' }}
-          />
-        </div>
+        {draft.profile && (
+          <VocabularyViewer profile={draft.profile} />
+        )}
 
         <div className="flex items-center gap-3">
           <button
@@ -544,7 +620,7 @@ function CustomNichePanel({ onCreated, onClose }) {
         <textarea
           value={postsText}
           onChange={e => setPostsText(e.target.value)}
-          placeholder="Paste one social media post per line from your industry&#10;Each post should be a realistic example of content relevant to your niche&#10;Min 5 posts required..."
+          placeholder="Paste one social media post per line from your industry"
           rows={8}
           className="w-full px-3 py-2 text-sm border focus:outline-none"
           style={{ backgroundColor: 'transparent', borderColor: '#333', color: 'var(--text)', resize: 'vertical' }}
@@ -575,6 +651,59 @@ function CustomNichePanel({ onCreated, onClose }) {
       {error && (
         <div className="mt-3 text-xs" style={{ color: 'var(--accent)' }}>
           {error}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function VocabularyViewer({ profile }) {
+  const categories = [
+    { key: 'industry_terms', label: 'INDUSTRY TERMS' },
+    { key: 'products', label: 'PRODUCTS' },
+    { key: 'topics', label: 'TOPICS' },
+    { key: 'hashtags', label: 'HASHTAGS' },
+    { key: 'brands', label: 'BRANDS' },
+    { key: 'audience', label: 'AUDIENCE' },
+  ]
+
+  return (
+    <div className="mb-4">
+      <label className="block text-xs mb-2" style={{ color: '#555' }}>
+        INDUSTRY VOCABULARY PROFILE
+      </label>
+      <div className="grid grid-cols-2 gap-2">
+        {categories.map(cat => {
+          const terms = profile[cat.key] || []
+          return (
+            <div key={cat.key} className="border p-2" style={{ borderColor: '#1C1C1C' }}>
+              <div className="text-xs mb-1" style={{ color: 'var(--accent)' }}>{cat.label}</div>
+              <div className="text-xs" style={{ color: '#888', maxHeight: '120px', overflowY: 'auto' }}>
+                {terms.length > 0
+                  ? terms.map((t, i) => (
+                      <span key={i} className="inline-block mr-1 mb-0.5 px-1.5 py-0.5"
+                        style={{ backgroundColor: '#141414', color: '#ccc' }}>
+                        {t}
+                      </span>
+                    ))
+                  : <span style={{ color: '#444' }}>—</span>
+                }
+              </div>
+            </div>
+          )
+        })}
+      </div>
+      {profile.synonyms && Object.keys(profile.synonyms).length > 0 && (
+        <div className="mt-2 border p-2" style={{ borderColor: '#1C1C1C' }}>
+          <div className="text-xs mb-1" style={{ color: 'var(--accent)' }}>SYNONYMS</div>
+          <div className="text-xs" style={{ color: '#888' }}>
+            {Object.entries(profile.synonyms).map(([key, vals]) => (
+              <div key={key} className="mb-0.5">
+                <span style={{ color: '#ccc' }}>{key}</span>
+                <span style={{ color: '#555' }}> → {vals.join(', ')}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

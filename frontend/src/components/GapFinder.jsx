@@ -1,6 +1,8 @@
+import MetricBar from './MetricBar'
+
 const getReason = (gap) => {
   const isHashtag = gap.type === 'hashtag'
-  return gap.reason || `${isHashtag ? '#' : 'kw'} High reach (${gap.reach_score.toFixed(0)}) + low saturation (${gap.competition_score.toFixed(0)}) — blue ocean opportunity`
+  return gap.reason || `${isHashtag ? '#' : 'kw'} High relevance (${(gap.semantic_relevance || 0).toFixed(0)}) + trend (${(gap.trend_score || 0).toFixed(0)}) + low saturation (${(gap.competition_score || 0).toFixed(0)}) — blue ocean`
 }
 
 export default function GapFinder({ gaps }) {
@@ -20,38 +22,44 @@ export default function GapFinder({ gaps }) {
           {gaps.length} BLUE OCEAN OPPORTUNIT{gaps.length > 1 ? 'IES' : 'Y'}
         </span>
         <span className="text-xs" style={{ color: '#555' }}>
-          High reach, low competition — first-mover advantage
+          High relevance, high trend, low competition — first-mover advantage
         </span>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {gaps.map((gap, i) => (
-          <div
-            key={i}
-            className="border p-4 flex items-start gap-3"
-            style={{
-              borderColor: i === 0 ? 'var(--accent)' : '#1C1C1C',
-              backgroundColor: i === 0 ? 'rgba(212,43,43,0.05)' : 'transparent',
-            }}
-          >
-            <div className="flex-shrink-0 w-1.5 h-1.5 mt-1.5" style={{ backgroundColor: i === 0 ? 'var(--accent)' : '#333' }} />
-            <div className="flex-1 min-w-0">
-              <div
-                className="text-sm break-all"
-                style={{
-                  color: i === 0 ? 'var(--accent)' : 'var(--text)',
-                  fontWeight: i === 0 ? 700 : 400,
-                }}
-              >
-                {gap.type === 'hashtag' ? '#' : ''}{gap.tag}
+        {gaps.map((gap, i) => {
+          const oppScore = ((gap.semantic_relevance || 0) * (gap.trend_score || 0) * (100 - (gap.competition_score || 0)) / 10000).toFixed(0)
+          return (
+            <div
+              key={i}
+              className="border p-4"
+              style={{
+                borderColor: i === 0 ? 'var(--accent)' : '#1C1C1C',
+                backgroundColor: i === 0 ? 'rgba(212,43,43,0.05)' : 'transparent',
+              }}
+            >
+              <div className="flex items-start justify-between mb-3">
+                <div>
+                  <div
+                    className="text-sm font-medium"
+                    style={{ color: i === 0 ? 'var(--accent)' : 'var(--text)' }}
+                  >
+                    {gap.type === 'hashtag' ? '#' : ''}{gap.tag}
+                  </div>
+                  <div className="text-xs mt-1" style={{ color: '#555' }}>{getReason(gap)}</div>
+                </div>
+                <div className="text-right flex-shrink-0 ml-3">
+                  <div className="text-lg font-bold" style={{ color: 'var(--accent)' }}>{oppScore}</div>
+                  <div className="text-xs" style={{ color: '#555' }}>OPPORTUNITY</div>
+                </div>
               </div>
-              <div className="text-xs mt-1" style={{ color: '#555' }}>{getReason(gap)}</div>
-              <div className="flex gap-4 mt-2 text-xs" style={{ color: '#666' }}>
-                <span>Reach: {gap.reach_score.toFixed(0)}</span>
-                <span>Comp: {gap.competition_score.toFixed(0)}</span>
+              <div className="space-y-1.5">
+                <MetricBar label="Relevance" value={gap.semantic_relevance || 0} />
+                <MetricBar label="Trend" value={gap.trend_score || 0} />
+                <MetricBar label="Competition" value={gap.competition_score || 0} color="#555" />
               </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )
