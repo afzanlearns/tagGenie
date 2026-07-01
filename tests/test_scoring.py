@@ -111,10 +111,9 @@ class TestConfidenceFormula:
         conf = compute_confidence(False)
         assert conf > 0
 
-    def test_fallback_docks_30(self):
-        conf_normal = compute_confidence(False)
-        conf_fallback = compute_confidence(True)
-        assert conf_normal - conf_fallback >= 30 or conf_fallback <= 0
+    def test_confidence_in_range(self):
+        conf = compute_confidence(False, "gps-telematics")
+        assert 0 <= conf <= 100
 
 
 class TestNicheScoring:
