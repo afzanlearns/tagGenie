@@ -38,14 +38,14 @@ export default function FeedbackSimulator({ tags, platform, niche = 'gps-telemat
   return (
     <div>
       <div className="flex items-center gap-2 mb-4">
-        <span className="text-xs px-2 py-0.5" style={{ backgroundColor: '#1C1C1C', color: '#888' }}>
+        <span className="text-xs px-2 py-0.5" style={{ backgroundColor: 'var(--border)', color: 'var(--text-secondary)' }}>
           SIMULATED
         </span>
-        <span className="text-xs" style={{ color: '#555' }}>
+        <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
           Send synthetic engagement data to trigger the feedback loop
         </span>
       </div>
-      <p className="text-xs mb-4" style={{ color: '#666' }}>
+      <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
         This posts the top 3 tags as a simulated social post with random engagement metrics.
         The nightly feedback job will use this data to adjust platform weights.
       </p>

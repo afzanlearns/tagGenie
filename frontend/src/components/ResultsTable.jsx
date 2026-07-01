@@ -7,7 +7,7 @@ export default function ResultsTable({ tags }) {
   const [selectedTag, setSelectedTag] = useState(null)
 
   if (!tags || tags.length === 0) {
-    return <div className="text-xs py-4" style={{ color: '#555' }}>No tags to display.</div>
+    return <div className="text-xs py-4" style={{ color: 'var(--text-tertiary)' }}>No tags to display.</div>
   }
 
   return (
@@ -16,16 +16,16 @@ export default function ResultsTable({ tags }) {
         <table className="w-full text-xs" style={{ borderCollapse: 'collapse', fontFamily: 'var(--font)' }}>
           <thead>
             <tr style={{ borderBottom: '1px solid #1C1C1C' }}>
-              <th className="text-left py-2 pr-3" style={{ color: '#555', fontWeight: 400 }}>#</th>
-              <th className="text-left py-2 pr-3" style={{ color: '#555', fontWeight: 400 }}>TAG</th>
-              <th className="text-left py-2 pr-3" style={{ color: '#555', fontWeight: 400 }}>CATEGORY</th>
-              <th className="text-left py-2 pr-3" style={{ color: '#555', fontWeight: 400 }}>QUALITY</th>
-              <th className="text-left py-2 pr-3" style={{ color: '#555', fontWeight: 400 }}>BAND</th>
-              <th className="text-right py-2 pr-3" style={{ color: '#555', fontWeight: 400 }}>FINAL</th>
-              <th className="text-right py-2 pr-3" style={{ color: '#555', fontWeight: 400 }}>REL</th>
-              <th className="text-right py-2 pr-3" style={{ color: '#555', fontWeight: 400 }}>TREND</th>
-              <th className="text-right py-2 pr-3" style={{ color: '#555', fontWeight: 400 }}>COMP</th>
-              <th className="text-left py-2" style={{ color: '#555', fontWeight: 400 }}>PLAT</th>
+              <th className="text-left py-2 pr-3" style={{ color: 'var(--text-tertiary)', fontWeight: 400 }}>#</th>
+              <th className="text-left py-2 pr-3" style={{ color: 'var(--text-tertiary)', fontWeight: 400 }}>TAG</th>
+              <th className="text-left py-2 pr-3" style={{ color: 'var(--text-tertiary)', fontWeight: 400 }}>CATEGORY</th>
+              <th className="text-left py-2 pr-3" style={{ color: 'var(--text-tertiary)', fontWeight: 400 }}>QUALITY</th>
+              <th className="text-left py-2 pr-3" style={{ color: 'var(--text-tertiary)', fontWeight: 400 }}>BAND</th>
+              <th className="text-right py-2 pr-3" style={{ color: 'var(--text-tertiary)', fontWeight: 400 }}>FINAL</th>
+              <th className="text-right py-2 pr-3" style={{ color: 'var(--text-tertiary)', fontWeight: 400 }}>REL</th>
+              <th className="text-right py-2 pr-3" style={{ color: 'var(--text-tertiary)', fontWeight: 400 }}>TREND</th>
+              <th className="text-right py-2 pr-3" style={{ color: 'var(--text-tertiary)', fontWeight: 400 }}>COMP</th>
+              <th className="text-left py-2" style={{ color: 'var(--text-tertiary)', fontWeight: 400 }}>PLAT</th>
             </tr>
           </thead>
           <tbody>
@@ -46,10 +46,10 @@ export default function ResultsTable({ tags }) {
                   className="cursor-pointer"
                   style={{ borderBottom: '1px solid #141414' }}
                   onClick={() => setSelectedTag(tag)}
-                  onMouseEnter={e => e.currentTarget.style.backgroundColor = '#0D0D0D'}
+                  onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--surface)'}
                   onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
                 >
-                  <td className="py-2.5 pr-3" style={{ color: '#444' }}>{i + 1}</td>
+                  <td className="py-2.5 pr-3" style={{ color: 'var(--text-muted)' }}>{i + 1}</td>
                   <td className="py-2.5 pr-3" style={{ color: 'var(--text)', fontWeight: i === 0 ? 700 : 400 }}>
                     {tag?.is_blue_ocean && (
                       <span style={{ color: 'var(--accent)' }}>● </span>
@@ -57,7 +57,7 @@ export default function ResultsTable({ tags }) {
                     {type === 'hashtag' ? '#' : ''}{label}
                   </td>
                   <td className="py-2.5 pr-3">
-                    <span className="text-xs px-1.5 py-0.5" style={{ backgroundColor: '#141414', color: '#888', border: '1px solid #2A2A2A', fontSize: '10px' }}>
+                    <span className="text-xs px-1.5 py-0.5" style={{ backgroundColor: 'var(--surface-2)', color: 'var(--text-secondary)', border: '1px solid #2A2A2A', fontSize: '10px' }}>
                       {cat}
                     </span>
                   </td>
@@ -89,13 +89,13 @@ export default function ResultsTable({ tags }) {
                   <td className="py-2.5 pr-3 text-right" style={{ fontVariantNumeric: 'tabular-nums' }}>
                     {formatScoreOne(finalScore)}
                   </td>
-                  <td className="py-2.5 pr-3 text-right" style={{ color: '#888', fontVariantNumeric: 'tabular-nums' }}>
+                  <td className="py-2.5 pr-3 text-right" style={{ color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>
                     {formatScore(semRel)}
                   </td>
-                  <td className="py-2.5 pr-3 text-right" style={{ color: '#888', fontVariantNumeric: 'tabular-nums' }}>
+                  <td className="py-2.5 pr-3 text-right" style={{ color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>
                     {formatScore(trend)}
                   </td>
-                  <td className="py-2.5 pr-3 text-right" style={{ color: '#888', fontVariantNumeric: 'tabular-nums' }}>
+                  <td className="py-2.5 pr-3 text-right" style={{ color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>
                     {formatScore(comp)}
                   </td>
                   <td className="py-2.5">
@@ -107,12 +107,12 @@ export default function ResultsTable({ tags }) {
           </tbody>
         </table>
       </div>
-      <div className="mt-2 flex gap-4 text-xs" style={{ color: '#555' }}>
+      <div className="mt-2 flex gap-4 text-xs" style={{ color: 'var(--text-tertiary)' }}>
         <span>REL = relevance</span>
         <span>TREND = momentum</span>
         <span>COMP = competition</span>
         <span>PLAT = platform fit</span>
-        <span className="ml-auto" style={{ color: '#444' }}>Click any row for details</span>
+        <span className="ml-auto" style={{ color: 'var(--text-muted)' }}>Click any row for details</span>
       </div>
 
       {selectedTag && (

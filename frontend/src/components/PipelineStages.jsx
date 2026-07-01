@@ -26,23 +26,23 @@ export default function PipelineStages({ active }) {
   if (!active) return null
 
   return (
-    <div className="border p-6 mb-4" style={{ borderColor: '#1C1C1C' }}>
+    <div className="border p-6 mb-4" style={{ borderColor: 'var(--border)' }}>
       <div className="flex items-center gap-3 mb-4">
         <div className="w-2 h-2 rounded-full" style={{ backgroundColor: 'var(--accent)', animation: 'pulse 1s infinite' }} />
         <span className="text-xs font-medium" style={{ color: 'var(--text)' }}>ANALYZING</span>
-        <span className="text-xs" style={{ color: '#555' }}>{current + 1} / {STAGES.length}</span>
+        <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{current + 1} / {STAGES.length}</span>
       </div>
       <div className="space-y-1">
         {STAGES.map((stage, i) => (
           <div key={i} className="flex items-center gap-2 text-xs py-0.5">
             <span style={{
-              color: i < current ? '#6a6' : i === current ? 'var(--accent)' : '#333',
+              color: i < current ? '#6a6' : i === current ? 'var(--accent)' : 'var(--border-light)',
               transition: 'color 0.3s',
             }}>
               {i < current ? '✓' : i === current ? '→' : '○'}
             </span>
             <span style={{
-              color: i <= current ? '#ccc' : '#444',
+              color: i <= current ? '#ccc' : 'var(--text-muted)',
               transition: 'color 0.3s',
             }}>
               {stage}

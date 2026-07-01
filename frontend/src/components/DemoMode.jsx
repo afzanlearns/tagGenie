@@ -124,14 +124,14 @@ export default function DemoMode({ onDemoScore, onDemoSelect, enabled, onToggle,
           <span className="text-xs px-2 py-0.5" style={{ backgroundColor: 'var(--accent)', color: 'var(--text)' }}>
             DEMO MODE
           </span>
-          <span className="text-xs" style={{ color: '#555' }}>
+          <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
             Select a pre-loaded topic to auto-run the full pipeline
           </span>
         </div>
         <button
           onClick={onToggle}
           className="text-xs px-3 py-1"
-          style={{ backgroundColor: 'transparent', border: '1px solid #333', color: '#555', cursor: 'pointer' }}
+          style={{ backgroundColor: 'transparent', border: '1px solid #333', color: 'var(--text-tertiary)', cursor: 'pointer' }}
         >
           DISABLE
         </button>
@@ -145,14 +145,14 @@ export default function DemoMode({ onDemoScore, onDemoSelect, enabled, onToggle,
               onClick={() => startDemo(i)}
               className="text-left p-4 border text-xs"
               style={{
-                borderColor: '#1C1C1C',
+                borderColor: 'var(--border)',
                 backgroundColor: 'transparent',
                 color: 'var(--text)',
                 cursor: 'pointer',
               }}
             >
               <div className="font-medium mb-1">{demo.topic}</div>
-              <div style={{ color: '#555' }}>
+              <div style={{ color: 'var(--text-tertiary)' }}>
                 {demo.product} · {demo.platform}
               </div>
             </button>
@@ -161,7 +161,7 @@ export default function DemoMode({ onDemoScore, onDemoSelect, enabled, onToggle,
       )}
 
       {stageMessages.length > 0 && (
-        <div className="border-t pt-4" style={{ borderColor: '#1C1C1C' }}>
+        <div className="border-t pt-4" style={{ borderColor: 'var(--border)' }}>
           <div className="text-xs font-medium mb-3" style={{ color: 'var(--text)' }}>
             PIPELINE PROGRESS
           </div>
@@ -172,12 +172,12 @@ export default function DemoMode({ onDemoScore, onDemoSelect, enabled, onToggle,
               </span>
               <div>
                 <span className="text-xs font-medium" style={{ color: 'var(--text)' }}>{s.label}</span>
-                <span className="text-xs ml-2" style={{ color: '#555' }}>{s.msg}</span>
+                <span className="text-xs ml-2" style={{ color: 'var(--text-tertiary)' }}>{s.msg}</span>
               </div>
             </div>
           ))}
           {running && (
-            <div className="text-xs mt-2" style={{ color: '#444' }}>
+            <div className="text-xs mt-2" style={{ color: 'var(--text-muted)' }}>
               Running stage {stageIndex + 1} of {STAGES.length}...
             </div>
           )}
@@ -190,15 +190,15 @@ export default function DemoMode({ onDemoScore, onDemoSelect, enabled, onToggle,
       )}
 
       {results && !running && (
-        <div className="border-t mt-4 pt-4" style={{ borderColor: '#1C1C1C' }}>
+        <div className="border-t mt-4 pt-4" style={{ borderColor: 'var(--border)' }}>
           <div className="text-xs font-medium mb-2" style={{ color: 'var(--text)' }}>
             SCORED RESULTS
           </div>
-          <div className="text-xs" style={{ color: '#555' }}>
+          <div className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
             {results.ranked_tags?.length || 0} ranked tags · {results.gap_tags?.length || 0} gap tags · Confidence: {results.confidence}% · {results.baseline_tags?.length || 0} baseline tags
           </div>
           {results.timings && (
-            <div className="text-xs mt-1" style={{ color: '#444' }}>
+            <div className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
               Response time: {results.timings.total}s (scoring: {results.timings.scoring_total}s, baseline: {results.timings.baseline}s)
             </div>
           )}

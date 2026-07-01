@@ -4,7 +4,7 @@ import { getRecommendationLabel, getRecommendationType, safeNumber } from '../re
 export default function HiddenGemsPanel({ gems }) {
   if (!gems || gems.length === 0) {
     return (
-      <div className="text-xs" style={{ color: '#555' }}>
+      <div className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
         No hidden gems detected. All tags show sufficient trend activity.
       </div>
     )
@@ -16,7 +16,7 @@ export default function HiddenGemsPanel({ gems }) {
         <span className="text-xs font-medium" style={{ color: '#8bc34a' }}>
           {gems.length} HIDDEN GEM{gems.length > 1 ? 'S' : ''}
         </span>
-        <span className="text-xs" style={{ color: '#555' }}>
+        <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
           High relevance, low competition, lower trend — long-tail opportunities
         </span>
       </div>
@@ -28,11 +28,11 @@ export default function HiddenGemsPanel({ gems }) {
           const comp = safeNumber(gem?.competition_score)
           const trend = safeNumber(gem?.trend_score)
           return (
-            <div key={i} className="border p-4" style={{ borderColor: '#1C1C1C' }}>
+            <div key={i} className="border p-4" style={{ borderColor: 'var(--border)' }}>
               <div className="text-sm font-medium mb-2" style={{ color: 'var(--text)' }}>
                 {type === 'hashtag' ? '#' : ''}{label}
               </div>
-              <div className="text-xs mb-3" style={{ color: '#555' }}>
+              <div className="text-xs mb-3" style={{ color: 'var(--text-tertiary)' }}>
                 {gem?.reason || `${label}: high relevance (${semRel.toFixed(0)}) + low competition (${comp.toFixed(0)}) — long-tail`}
               </div>
               <div className="space-y-1.5">

@@ -25,7 +25,7 @@ export function clearHistory() {
 export default function RecommendationHistory({ entries, onRestore, onClear }) {
   if (!entries || entries.length === 0) {
     return (
-      <div className="text-xs" style={{ color: '#555' }}>
+      <div className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
         No search history yet. Generate recommendations to build your history.
       </div>
     )
@@ -38,7 +38,7 @@ export default function RecommendationHistory({ entries, onRestore, onClear }) {
         <button
           onClick={onClear}
           className="text-xs px-2 py-0.5"
-          style={{ backgroundColor: 'transparent', border: '1px solid #333', color: '#555', cursor: 'pointer' }}
+          style={{ backgroundColor: 'transparent', border: '1px solid #333', color: 'var(--text-tertiary)', cursor: 'pointer' }}
         >
           CLEAR
         </button>
@@ -53,11 +53,11 @@ export default function RecommendationHistory({ entries, onRestore, onClear }) {
           >
             <div className="min-w-0">
               <div className="truncate" style={{ color: 'var(--text)' }}>{e.topic}</div>
-              <div style={{ color: '#555' }}>
+              <div style={{ color: 'var(--text-tertiary)' }}>
                 {e.product} · {e.platform} · {e.tags || 0} tags
               </div>
             </div>
-            <span className="text-xs flex-shrink-0 ml-2" style={{ color: '#444' }}>
+            <span className="text-xs flex-shrink-0 ml-2" style={{ color: 'var(--text-muted)' }}>
               {new Date(e.timestamp).toLocaleDateString()}
             </span>
           </div>

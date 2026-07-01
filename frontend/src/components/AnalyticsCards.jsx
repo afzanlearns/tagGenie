@@ -26,13 +26,13 @@ export default function AnalyticsCards({ results }) {
 
   return (
     <div className="mb-6">
-      <div className="text-xs font-medium mb-3" style={{ color: '#555' }}>ANALYTICS SUMMARY</div>
+      <div className="text-xs font-medium mb-3" style={{ color: 'var(--text-tertiary)' }}>ANALYTICS SUMMARY</div>
       <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
         {cards.map(c => (
-          <div key={c.label} className="border p-3" style={{ borderColor: '#1C1C1C' }}>
-            <div className="text-xs mb-0.5" style={{ color: '#555' }}>{c.label}</div>
+          <div key={c.label} className="border p-3" style={{ borderColor: 'var(--border)' }}>
+            <div className="text-xs mb-0.5" style={{ color: 'var(--text-tertiary)' }}>{c.label}</div>
             <div className="text-lg font-bold" style={{ color: 'var(--text)' }}>{c.value}</div>
-            {c.sub && <div className="text-xs" style={{ color: '#555' }}>{c.sub}</div>}
+            {c.sub && <div className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{c.sub}</div>}
           </div>
         ))}
       </div>

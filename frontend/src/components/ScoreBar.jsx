@@ -4,7 +4,7 @@ export default function ScoreBar({ value, max = 100 }) {
 
   return (
     <div className="flex items-center gap-2">
-      <div className="flex-1 h-1" style={{ backgroundColor: '#1C1C1C', borderRadius: '0' }}>
+      <div className="flex-1 h-1" style={{ backgroundColor: 'var(--border)', borderRadius: '0' }}>
         <div
           className="h-full"
           style={{
@@ -15,7 +15,7 @@ export default function ScoreBar({ value, max = 100 }) {
           }}
         />
       </div>
-      <span className="text-xs" style={{ color: isCritical ? 'var(--accent)' : '#555' }}>
+      <span className="text-xs" style={{ color: isCritical ? 'var(--accent)' : 'var(--text-tertiary)' }}>
         {pct.toFixed(0)}
       </span>
     </div>

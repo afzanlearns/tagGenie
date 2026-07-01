@@ -40,6 +40,7 @@ export default function App({ onLogout }) {
   const [tab, setTab] = useState('results')
   const [demoMode, setDemoMode] = useState(false)
   const [historyEntries, setHistoryEntries] = useState(loadHistory)
+  const [theme, setTheme] = useState(() => localStorage.getItem('taggenie-theme') || 'dark')
 
   const [niches, setNiches] = useState([])
   const [activeNiche, setActiveNiche] = useState('gps-telematics')
@@ -165,23 +166,23 @@ export default function App({ onLogout }) {
   const currentNicheName = niches.find(n => n.niche_id === activeNiche)?.display_name || activeNiche
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: 'var(--canvas)', color: 'var(--text)', fontFamily: 'var(--font)' }}>
-      <header className="border-b px-6 py-4" style={{ borderColor: '#1C1C1C' }}>
+    <div className="min-h-screen" data-theme={theme} style={{ backgroundColor: 'var(--canvas)', color: 'var(--text)', fontFamily: 'var(--font)' }}>
+      <header className="border-b px-6 py-4" style={{ borderColor: 'var(--border)' }}>
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div>
               <h1 className="text-lg tracking-tight" style={{ color: 'var(--text)' }}>TagGenie</h1>
-              <p className="text-xs mt-0.5" style={{ color: '#555' }}>Distribution Intelligence Engine</p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>Distribution Intelligence Engine</p>
             </div>
-            <div className="flex items-center gap-2 ml-6 pl-6 border-l" style={{ borderColor: '#1C1C1C' }}>
-              <span className="text-xs" style={{ color: '#555' }}>NICHE</span>
+            <div className="flex items-center gap-2 ml-6 pl-6 border-l" style={{ borderColor: 'var(--border)' }}>
+              <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>NICHE</span>
               <select
                 value={activeNiche}
                 onChange={e => handleNicheSwitch(e.target.value)}
                 className="text-xs px-2 py-1 border appearance-none focus:outline-none"
                 style={{
                   backgroundColor: 'transparent',
-                  borderColor: '#333',
+                  borderColor: 'var(--border-light)',
                   color: 'var(--text)',
                   borderRadius: '0',
                 }}
@@ -193,14 +194,14 @@ export default function App({ onLogout }) {
               <button
                 onClick={() => setShowNichePanel(!showNichePanel)}
                 className="text-xs px-2 py-1"
-                style={{ backgroundColor: 'transparent', border: '1px solid #333', color: '#888', cursor: 'pointer' }}
+                style={{ backgroundColor: 'transparent', border: '1px solid #333', color: 'var(--text-secondary)', cursor: 'pointer' }}
               >
                 + CUSTOM
               </button>
             </div>
           </div>
           {results && (
-            <div className="flex items-center gap-3 text-xs" style={{ color: '#666' }}>
+            <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--text-muted)' }}>
               <span>Niche: {currentNicheName}</span>
               <span>Confidence: {results.confidence}%</span>
               {results.fallback_mode && <span style={{ color: 'var(--accent)' }}>FALLBACK</span>}
@@ -209,7 +210,7 @@ export default function App({ onLogout }) {
                 <button
                   onClick={handleSaveCurrentSet}
                   className="text-xs px-2 py-1"
-                  style={{ backgroundColor: 'transparent', border: '1px solid #333', color: '#888', cursor: 'pointer' }}
+                  style={{ backgroundColor: 'transparent', border: '1px solid #333', color: 'var(--text-secondary)', cursor: 'pointer' }}
                 >
                   + SAVE
                 </button>
@@ -218,19 +219,27 @@ export default function App({ onLogout }) {
           )}
           <div className="flex items-center gap-2">
             <button
+              onClick={() => { const next = theme === 'dark' ? 'light' : 'dark'; setTheme(next); localStorage.setItem('taggenie-theme', next) }}
+              className="text-xs px-2 py-1"
+              style={{ backgroundColor: 'transparent', border: '1px solid var(--border-light)', color: 'var(--text-tertiary)', cursor: 'pointer' }}
+              title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+            >
+              {theme === 'dark' ? '☀' : '☾'}
+            </button>
+            <button
               onClick={() => setDemoMode(!demoMode)}
               className="text-xs px-3 py-1"
               style={{
                 backgroundColor: demoMode ? 'var(--accent)' : 'transparent',
-                color: demoMode ? 'var(--text)' : '#555',
-                border: `1px solid ${demoMode ? 'var(--accent)' : '#333'}`,
+                color: demoMode ? 'var(--text)' : 'var(--text-tertiary)',
+                border: `1px solid ${demoMode ? 'var(--accent)' : 'var(--border-light)'}`,
                 cursor: 'pointer',
               }}
             >
               {demoMode ? 'DEMO ON' : 'DEMO MODE'}
             </button>
             {isGuest() && (
-              <span className="text-xs px-2 py-0.5" style={{ backgroundColor: '#222', color: '#aa6', border: '1px solid #443' }}>
+              <span className="text-xs px-2 py-0.5" style={{ backgroundColor: 'var(--surface-3)', color: 'var(--accent-dim)', border: '1px solid #443' }}>
                 GUEST
               </span>
             )}
@@ -238,7 +247,7 @@ export default function App({ onLogout }) {
               <button
                 onClick={onLogout}
                 className="text-xs px-3 py-1"
-                style={{ backgroundColor: 'transparent', color: '#555', border: '1px solid #333', cursor: 'pointer' }}
+                style={{ backgroundColor: 'transparent', color: 'var(--text-tertiary)', border: '1px solid var(--border-light)', cursor: 'pointer' }}
               >
                 {isGuest() ? 'LEAVE GUEST MODE' : 'LOG OUT'}
               </button>
@@ -292,7 +301,7 @@ export default function App({ onLogout }) {
             <AnalyticsCards results={results} />
             {results.mix_summary && <MixSummary mix={results.mix_summary} />}
 
-            <div className="flex gap-0 border-b overflow-x-auto" style={{ borderColor: '#1C1C1C' }}>
+            <div className="flex gap-0 border-b overflow-x-auto" style={{ borderColor: 'var(--border)' }}>
               {[
                 { key: 'results', label: 'RANKED', count: results.ranked_tags?.length },
                 { key: 'gaps', label: 'BLUE OCEAN', count: results.gap_tags?.length },
@@ -311,9 +320,9 @@ export default function App({ onLogout }) {
                   onClick={() => setTab(t.key)}
                   className={`px-3 py-2 text-xs whitespace-nowrap ${tab === t.key ? 'border' : ''}`}
                   style={{
-                    borderColor: tab === t.key ? '#333' : 'transparent',
+                    borderColor: tab === t.key ? 'var(--border-light)' : 'transparent',
                     borderBottom: 'none',
-                    color: tab === t.key ? 'var(--text)' : '#555',
+                    color: tab === t.key ? 'var(--text)' : 'var(--text-tertiary)',
                     cursor: 'pointer',
                   }}
                 >
@@ -322,7 +331,7 @@ export default function App({ onLogout }) {
               ))}
             </div>
 
-            <div className="border border-t-0 p-6" style={{ borderColor: '#1C1C1C' }}>
+            <div className="border border-t-0 p-6" style={{ borderColor: 'var(--border)' }}>
               {tab === 'results' && <ResultsTable tags={results.ranked_tags} />}
               {tab === 'gaps' && <GapFinder gaps={results.gap_tags} />}
               {tab === 'high_comp' && <HighCompetitionPanel tags={results.high_competition_tags} />}
@@ -341,7 +350,7 @@ export default function App({ onLogout }) {
         )}
 
         {!results && !loading && !error && tab !== 'dashboard' && tab !== 'saved' && tab !== 'history' && (
-          <div className="mt-6 border p-6" style={{ borderColor: '#1C1C1C' }}>
+          <div className="mt-6 border p-6" style={{ borderColor: 'var(--border)' }}>
             {tab === 'dashboard' && <DashboardPage currentUser={currentUser} />}
             {tab === 'saved' && <SavedSetsPanel currentUser={currentUser} />}
             {tab === 'history' && (
@@ -415,32 +424,32 @@ function CustomNichePanel({ onCreated, onClose }) {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <span className="text-xs px-2 py-0.5" style={{ backgroundColor: 'var(--accent)', color: 'var(--text)' }}>REVIEW NICHE: {draft.display_name}</span>
-            <span className="text-xs" style={{ color: '#555' }}>Edit the auto-generated content before saving</span>
+            <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Edit the auto-generated content before saving</span>
           </div>
           <div className="flex gap-2">
-            <button onClick={() => setStep('input')} className="text-xs px-3 py-1" style={{ backgroundColor: 'transparent', border: '1px solid #333', color: '#888', cursor: 'pointer' }}>← BACK</button>
-            <button onClick={onClose} className="text-xs px-3 py-1" style={{ backgroundColor: 'transparent', border: '1px solid #333', color: '#555', cursor: 'pointer' }}>CANCEL</button>
+            <button onClick={() => setStep('input')} className="text-xs px-3 py-1" style={{ backgroundColor: 'transparent', border: '1px solid #333', color: 'var(--text-secondary)', cursor: 'pointer' }}>← BACK</button>
+            <button onClick={onClose} className="text-xs px-3 py-1" style={{ backgroundColor: 'transparent', border: '1px solid #333', color: 'var(--text-tertiary)', cursor: 'pointer' }}>CANCEL</button>
           </div>
         </div>
         <div className="mb-4">
-          <label className="block text-xs mb-1.5" style={{ color: '#555' }}>DESCRIPTION</label>
-          <input type="text" value={description} onChange={e => setDescription(e.target.value)} className="w-full px-3 py-2 text-sm border focus:outline-none" style={{ backgroundColor: 'transparent', borderColor: '#333', color: 'var(--text)' }} />
+          <label className="block text-xs mb-1.5" style={{ color: 'var(--text-tertiary)' }}>DESCRIPTION</label>
+          <input type="text" value={description} onChange={e => setDescription(e.target.value)} className="w-full px-3 py-2 text-sm border focus:outline-none" style={{ backgroundColor: 'transparent', borderColor: 'var(--border-light)', color: 'var(--text)' }} />
         </div>
         <div className="mb-4">
-          <label className="block text-xs mb-1.5" style={{ color: '#555' }}>SAMPLE TOPICS (one per line)</label>
-          <textarea value={editTopics} onChange={e => setEditTopics(e.target.value)} rows={3} className="w-full px-3 py-2 text-sm border focus:outline-none" style={{ backgroundColor: 'transparent', borderColor: '#333', color: 'var(--text)', resize: 'vertical' }} />
+          <label className="block text-xs mb-1.5" style={{ color: 'var(--text-tertiary)' }}>SAMPLE TOPICS (one per line)</label>
+          <textarea value={editTopics} onChange={e => setEditTopics(e.target.value)} rows={3} className="w-full px-3 py-2 text-sm border focus:outline-none" style={{ backgroundColor: 'transparent', borderColor: 'var(--border-light)', color: 'var(--text)', resize: 'vertical' }} />
         </div>
         <div className="mb-4">
-          <label className="block text-xs mb-1.5" style={{ color: '#555' }}>CORPUS / SEED POSTS (one per line, editable)</label>
-          <textarea value={editCorpus} onChange={e => setEditCorpus(e.target.value)} rows={8} className="w-full px-3 py-2 text-sm border focus:outline-none font-mono" style={{ backgroundColor: 'transparent', borderColor: '#333', color: 'var(--text)', resize: 'vertical', fontSize: '11px' }} />
+          <label className="block text-xs mb-1.5" style={{ color: 'var(--text-tertiary)' }}>CORPUS / SEED POSTS (one per line, editable)</label>
+          <textarea value={editCorpus} onChange={e => setEditCorpus(e.target.value)} rows={8} className="w-full px-3 py-2 text-sm border focus:outline-none font-mono" style={{ backgroundColor: 'transparent', borderColor: 'var(--border-light)', color: 'var(--text)', resize: 'vertical', fontSize: '11px' }} />
         </div>
         {draft.profile && <VocabularyViewer profile={draft.profile} />}
         <div className="flex items-center gap-3">
           <button onClick={handleSave} disabled={saving} className="px-6 py-2 text-xs font-medium disabled:opacity-30" style={{ backgroundColor: 'var(--accent)', color: 'var(--text)', border: 'none', cursor: saving ? 'wait' : 'pointer' }}>
             {saving ? 'SAVING...' : 'SAVE NICHE'}
           </button>
-          <button onClick={() => setStep('input')} className="px-4 py-2 text-xs" style={{ backgroundColor: 'transparent', border: '1px solid #333', color: '#888', cursor: 'pointer' }}>REGENERATE</button>
-          <span className="text-xs" style={{ color: '#555' }}>{editCorpus.split('\n').filter(l => l.trim().length > 5).length} corpus entries</span>
+          <button onClick={() => setStep('input')} className="px-4 py-2 text-xs" style={{ backgroundColor: 'transparent', border: '1px solid #333', color: 'var(--text-secondary)', cursor: 'pointer' }}>REGENERATE</button>
+          <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{editCorpus.split('\n').filter(l => l.trim().length > 5).length} corpus entries</span>
         </div>
         {draft._fallback && <div className="mt-3 text-xs" style={{ color: '#aa6' }}>LLM unavailable, used heuristic fallback. Review the generated content carefully.</div>}
         {error && <div className="mt-3 text-xs" style={{ color: 'var(--accent)' }}>{error}</div>}
@@ -453,33 +462,33 @@ function CustomNichePanel({ onCreated, onClose }) {
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <span className="text-xs px-2 py-0.5" style={{ backgroundColor: 'var(--accent)', color: 'var(--text)' }}>CREATE CUSTOM NICHE</span>
-          <span className="text-xs" style={{ color: '#555' }}>Paste 5+ sample posts to generate a draft, then review before saving</span>
+          <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Paste 5+ sample posts to generate a draft, then review before saving</span>
         </div>
-        <button onClick={onClose} className="text-xs px-3 py-1" style={{ backgroundColor: 'transparent', border: '1px solid #333', color: '#555', cursor: 'pointer' }}>CLOSE</button>
+        <button onClick={onClose} className="text-xs px-3 py-1" style={{ backgroundColor: 'transparent', border: '1px solid #333', color: 'var(--text-tertiary)', cursor: 'pointer' }}>CLOSE</button>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
         <div>
-          <label className="block text-xs mb-1.5" style={{ color: '#555' }}>NICHE ID</label>
-          <input type="text" value={nicheId} onChange={e => setNicheId(e.target.value)} placeholder="e.g., my-industry" className="w-full px-3 py-2 text-sm border focus:outline-none" style={{ backgroundColor: 'transparent', borderColor: '#333', color: 'var(--text)' }} />
+          <label className="block text-xs mb-1.5" style={{ color: 'var(--text-tertiary)' }}>NICHE ID</label>
+          <input type="text" value={nicheId} onChange={e => setNicheId(e.target.value)} placeholder="e.g., my-industry" className="w-full px-3 py-2 text-sm border focus:outline-none" style={{ backgroundColor: 'transparent', borderColor: 'var(--border-light)', color: 'var(--text)' }} />
         </div>
         <div>
-          <label className="block text-xs mb-1.5" style={{ color: '#555' }}>DISPLAY NAME</label>
-          <input type="text" value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="e.g., My Industry" className="w-full px-3 py-2 text-sm border focus:outline-none" style={{ backgroundColor: 'transparent', borderColor: '#333', color: 'var(--text)' }} />
+          <label className="block text-xs mb-1.5" style={{ color: 'var(--text-tertiary)' }}>DISPLAY NAME</label>
+          <input type="text" value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="e.g., My Industry" className="w-full px-3 py-2 text-sm border focus:outline-none" style={{ backgroundColor: 'transparent', borderColor: 'var(--border-light)', color: 'var(--text)' }} />
         </div>
         <div>
-          <label className="block text-xs mb-1.5" style={{ color: '#555' }}>DESCRIPTION (optional)</label>
-          <input type="text" value={description} onChange={e => setDescription(e.target.value)} placeholder="Brief description of the industry" className="w-full px-3 py-2 text-sm border focus:outline-none" style={{ backgroundColor: 'transparent', borderColor: '#333', color: 'var(--text)' }} />
+          <label className="block text-xs mb-1.5" style={{ color: 'var(--text-tertiary)' }}>DESCRIPTION (optional)</label>
+          <input type="text" value={description} onChange={e => setDescription(e.target.value)} placeholder="Brief description of the industry" className="w-full px-3 py-2 text-sm border focus:outline-none" style={{ backgroundColor: 'transparent', borderColor: 'var(--border-light)', color: 'var(--text)' }} />
         </div>
       </div>
       <div className="mb-4">
-        <label className="block text-xs mb-1.5" style={{ color: '#555' }}>SAMPLE POSTS (one per line, minimum 5)</label>
-        <textarea value={postsText} onChange={e => setPostsText(e.target.value)} placeholder="Paste one social media post per line from your industry" rows={8} className="w-full px-3 py-2 text-sm border focus:outline-none" style={{ backgroundColor: 'transparent', borderColor: '#333', color: 'var(--text)', resize: 'vertical' }} />
+        <label className="block text-xs mb-1.5" style={{ color: 'var(--text-tertiary)' }}>SAMPLE POSTS (one per line, minimum 5)</label>
+        <textarea value={postsText} onChange={e => setPostsText(e.target.value)} placeholder="Paste one social media post per line from your industry" rows={8} className="w-full px-3 py-2 text-sm border focus:outline-none" style={{ backgroundColor: 'transparent', borderColor: 'var(--border-light)', color: 'var(--text)', resize: 'vertical' }} />
       </div>
       <div className="flex items-center gap-3">
         <button onClick={handleGenerate} disabled={generating} className="px-6 py-2 text-xs font-medium disabled:opacity-30" style={{ backgroundColor: 'var(--accent)', color: 'var(--text)', border: 'none', cursor: generating ? 'wait' : 'pointer' }}>
           {generating ? 'GENERATING...' : 'GENERATE DRAFT'}
         </button>
-        {samplePosts().length > 0 && <span className="text-xs" style={{ color: '#555' }}>{samplePosts().length} posts</span>}
+        {samplePosts().length > 0 && <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{samplePosts().length} posts</span>}
       </div>
       {error && <div className="mt-3 text-xs" style={{ color: 'var(--accent)' }}>{error}</div>}
     </div>
@@ -498,19 +507,19 @@ function VocabularyViewer({ profile }) {
 
   return (
     <div className="mb-4">
-      <label className="block text-xs mb-2" style={{ color: '#555' }}>INDUSTRY VOCABULARY PROFILE</label>
+      <label className="block text-xs mb-2" style={{ color: 'var(--text-tertiary)' }}>INDUSTRY VOCABULARY PROFILE</label>
       <div className="grid grid-cols-2 gap-2">
         {categories.map(cat => {
           const terms = profile[cat.key] || []
           return (
-            <div key={cat.key} className="border p-2" style={{ borderColor: '#1C1C1C' }}>
+            <div key={cat.key} className="border p-2" style={{ borderColor: 'var(--border)' }}>
               <div className="text-xs mb-1" style={{ color: 'var(--accent)' }}>{cat.label}</div>
-              <div className="text-xs" style={{ color: '#888', maxHeight: '120px', overflowY: 'auto' }}>
+              <div className="text-xs" style={{ color: 'var(--text-secondary)', maxHeight: '120px', overflowY: 'auto' }}>
                 {terms.length > 0
                   ? terms.map((t, i) => (
-                      <span key={i} className="inline-block mr-1 mb-0.5 px-1.5 py-0.5" style={{ backgroundColor: '#141414', color: '#ccc' }}>{t}</span>
+                      <span key={i} className="inline-block mr-1 mb-0.5 px-1.5 py-0.5" style={{ backgroundColor: 'var(--surface-2)', color: '#ccc' }}>{t}</span>
                     ))
-                  : <span style={{ color: '#444' }}>—</span>
+                  : <span style={{ color: 'var(--text-muted)' }}>—</span>
                 }
               </div>
             </div>
@@ -518,13 +527,13 @@ function VocabularyViewer({ profile }) {
         })}
       </div>
       {profile.synonyms && Object.keys(profile.synonyms).length > 0 && (
-        <div className="mt-2 border p-2" style={{ borderColor: '#1C1C1C' }}>
+        <div className="mt-2 border p-2" style={{ borderColor: 'var(--border)' }}>
           <div className="text-xs mb-1" style={{ color: 'var(--accent)' }}>SYNONYMS</div>
-          <div className="text-xs" style={{ color: '#888' }}>
+          <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>
             {Object.entries(profile.synonyms).map(([key, vals]) => (
               <div key={key} className="mb-0.5">
                 <span style={{ color: '#ccc' }}>{key}</span>
-                <span style={{ color: '#555' }}> → {vals.join(', ')}</span>
+                <span style={{ color: 'var(--text-tertiary)' }}> → {vals.join(', ')}</span>
               </div>
             ))}
           </div>

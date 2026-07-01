@@ -3,7 +3,7 @@ import { getRecommendationLabel, getRecommendationType, competitionLevel } from 
 export default function HighCompetitionPanel({ tags }) {
   if (!tags || tags.length === 0) {
     return (
-      <div className="text-xs" style={{ color: '#555' }}>
+      <div className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
         No high competition tags detected. All candidates show moderate to low saturation levels.
       </div>
     )
@@ -15,7 +15,7 @@ export default function HighCompetitionPanel({ tags }) {
         <span className="text-xs font-medium" style={{ color: '#d42b2b' }}>
           {tags.length} HIGH COMPETITION TAG{tags.length > 1 ? 'S' : ''}
         </span>
-        <span className="text-xs" style={{ color: '#555' }}>
+        <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
           Highly saturated terms — generally should be avoided
         </span>
       </div>
@@ -26,9 +26,9 @@ export default function HighCompetitionPanel({ tags }) {
           const comp = tag?.competition_score || 0
           const level = competitionLevel(comp)
           return (
-            <div key={i} className="border px-4 py-3 flex items-center justify-between" style={{ borderColor: '#1C1C1C' }}>
+            <div key={i} className="border px-4 py-3 flex items-center justify-between" style={{ borderColor: 'var(--border)' }}>
               <div className="flex items-center gap-2 min-w-0">
-                <span className="text-xs" style={{ color: '#444' }}>{i + 1}</span>
+                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{i + 1}</span>
                 <span className="text-xs truncate" style={{ color: 'var(--text)' }}>
                   {type === 'hashtag' ? '#' : ''}{label}
                 </span>
@@ -42,7 +42,7 @@ export default function HighCompetitionPanel({ tags }) {
                 }}>
                   {level.label}
                 </span>
-                <span className="text-xs" style={{ color: '#555' }}>Competition: {comp.toFixed(0)}</span>
+                <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Competition: {comp.toFixed(0)}</span>
               </div>
             </div>
           )

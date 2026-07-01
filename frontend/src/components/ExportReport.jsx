@@ -130,14 +130,14 @@ ${report.analytics ? `<div class="section">Analytics</div>
 
   return (
     <div className="flex items-center gap-2">
-      <span className="text-xs" style={{ color: '#555' }}>EXPORT</span>
-      <button onClick={exportJSON} className="text-xs px-2 py-1" style={{ backgroundColor: 'transparent', border: '1px solid #333', color: '#888', cursor: 'pointer' }}>
+      <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>EXPORT</span>
+      <button onClick={exportJSON} className="text-xs px-2 py-1" style={{ backgroundColor: 'transparent', border: '1px solid #333', color: 'var(--text-secondary)', cursor: 'pointer' }}>
         JSON
       </button>
-      <button onClick={exportCSV} className="text-xs px-2 py-1" style={{ backgroundColor: 'transparent', border: '1px solid #333', color: '#888', cursor: 'pointer' }}>
+      <button onClick={exportCSV} className="text-xs px-2 py-1" style={{ backgroundColor: 'transparent', border: '1px solid #333', color: 'var(--text-secondary)', cursor: 'pointer' }}>
         CSV
       </button>
-      <button onClick={exportPDF} className="text-xs px-2 py-1" style={{ backgroundColor: 'transparent', border: '1px solid #333', color: '#888', cursor: 'pointer' }}>
+      <button onClick={exportPDF} className="text-xs px-2 py-1" style={{ backgroundColor: 'transparent', border: '1px solid #333', color: 'var(--text-secondary)', cursor: 'pointer' }}>
         HTML
       </button>
     </div>

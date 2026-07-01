@@ -6,16 +6,16 @@ function ContributionBar({ label, value, color, max }) {
   const pct = max > 0 ? (value / max) * 100 : 0
   return (
     <div className="flex items-center gap-2">
-      <span className="text-xs flex-shrink-0" style={{ color: '#555', width: '80px' }}>{label}</span>
-      <div className="flex-1" style={{ backgroundColor: '#141414', height: '6px', position: 'relative' }}>
+      <span className="text-xs flex-shrink-0" style={{ color: 'var(--text-tertiary)', width: '80px' }}>{label}</span>
+      <div className="flex-1" style={{ backgroundColor: 'var(--surface-2)', height: '6px', position: 'relative' }}>
         <div style={{
           width: `${pct}%`,
           height: '100%',
-          backgroundColor: color || '#555',
+          backgroundColor: color || 'var(--text-tertiary)',
           transition: 'width 0.5s',
         }} />
       </div>
-      <span className="text-xs flex-shrink-0 text-right" style={{ color: '#888', width: '24px', fontVariantNumeric: 'tabular-nums' }}>
+      <span className="text-xs flex-shrink-0 text-right" style={{ color: 'var(--text-secondary)', width: '24px', fontVariantNumeric: 'tabular-nums' }}>
         {value.toFixed(1)}
       </span>
     </div>
@@ -60,19 +60,19 @@ export default function DetailsDrawer({ tag, onClose }) {
       right: 0,
       width: '380px',
       height: '100vh',
-      backgroundColor: '#0A0A0A',
+      backgroundColor: 'var(--surface)',
       borderLeft: '1px solid #1C1C1C',
       zIndex: 100,
       overflowY: 'auto',
       padding: '20px',
     }}>
       <div className="flex items-center justify-between mb-6">
-        <span className="text-xs font-medium" style={{ color: '#555' }}>RECOMMENDATION DETAILS</span>
+        <span className="text-xs font-medium" style={{ color: 'var(--text-tertiary)' }}>RECOMMENDATION DETAILS</span>
         <div className="flex items-center gap-2">
           <button
             onClick={() => { copyToClipboard(label); setCopied(true); setTimeout(() => setCopied(false), 1500) }}
             className="text-xs px-2 py-1"
-            style={{ backgroundColor: 'transparent', border: '1px solid #333', color: '#888', cursor: 'pointer' }}
+            style={{ backgroundColor: 'transparent', border: '1px solid #333', color: 'var(--text-secondary)', cursor: 'pointer' }}
             title="Copy tag name"
           >
             {copied ? '✓' : '📋'}
@@ -80,7 +80,7 @@ export default function DetailsDrawer({ tag, onClose }) {
           <button
             onClick={onClose}
             className="text-xs px-2 py-1"
-            style={{ backgroundColor: 'transparent', border: '1px solid #333', color: '#888', cursor: 'pointer' }}
+            style={{ backgroundColor: 'transparent', border: '1px solid #333', color: 'var(--text-secondary)', cursor: 'pointer' }}
           >
             ✕
           </button>
@@ -93,12 +93,12 @@ export default function DetailsDrawer({ tag, onClose }) {
         </div>
         <div className="flex items-center gap-2 mt-2">
           {cat && (
-            <span className="text-xs px-1.5 py-0.5" style={{ backgroundColor: '#141414', color: '#888', border: '1px solid #2A2A2A' }}>
+            <span className="text-xs px-1.5 py-0.5" style={{ backgroundColor: 'var(--surface-2)', color: 'var(--text-secondary)', border: '1px solid #2A2A2A' }}>
               {cat}
             </span>
           )}
           {type && (
-            <span className="text-xs px-1.5 py-0.5" style={{ backgroundColor: '#141414', color: '#888', border: '1px solid #2A2A2A' }}>
+            <span className="text-xs px-1.5 py-0.5" style={{ backgroundColor: 'var(--surface-2)', color: 'var(--text-secondary)', border: '1px solid #2A2A2A' }}>
               {type.toUpperCase()}
             </span>
           )}
@@ -124,7 +124,7 @@ export default function DetailsDrawer({ tag, onClose }) {
 
       {qualities.length > 0 && (
         <div className="mb-4">
-          <div className="text-xs font-medium mb-2" style={{ color: '#555' }}>QUALITY INDICATORS</div>
+          <div className="text-xs font-medium mb-2" style={{ color: 'var(--text-tertiary)' }}>QUALITY INDICATORS</div>
           <div className="flex flex-wrap gap-1.5">
             {qualities.map((q, qi) => (
               <span key={qi} className="text-xs px-2 py-0.5" style={{
@@ -153,7 +153,7 @@ export default function DetailsDrawer({ tag, onClose }) {
 
       {maxContrib > 0 && (
         <div className="mb-4">
-          <div className="text-xs font-medium mb-2" style={{ color: '#555' }}>SCORE BREAKDOWN</div>
+          <div className="text-xs font-medium mb-2" style={{ color: 'var(--text-tertiary)' }}>SCORE BREAKDOWN</div>
           <div className="space-y-1">
             <ContributionBar label="Semantic" value={safeNumber(breakdown?.semantic_contribution)} color="#d42b2b" max={maxContrib} />
             <ContributionBar label="Trend" value={safeNumber(breakdown?.trend_contribution)} color="#b8860b" max={maxContrib} />
@@ -166,8 +166,8 @@ export default function DetailsDrawer({ tag, onClose }) {
 
       {explanation && (
         <div className="mb-4">
-          <div className="text-xs font-medium mb-2" style={{ color: '#555' }}>WHY RECOMMENDED</div>
-          <p className="text-xs leading-relaxed" style={{ color: '#888', whiteSpace: 'pre-wrap' }}>
+          <div className="text-xs font-medium mb-2" style={{ color: 'var(--text-tertiary)' }}>WHY RECOMMENDED</div>
+          <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>
             {explanation}
           </p>
         </div>

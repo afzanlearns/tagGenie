@@ -32,31 +32,31 @@ export default function PlatformComparison({ topic, product, niche, onSelectTag 
   }, [topic, product, niche])
 
   if (!topic || !product) {
-    return <div className="text-xs" style={{ color: '#555' }}>Enter a topic and product to compare platforms.</div>
+    return <div className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Enter a topic and product to compare platforms.</div>
   }
 
   return (
     <div>
       <div className="flex items-center gap-2 mb-4">
         <span className="text-xs font-medium" style={{ color: 'var(--text)' }}>PLATFORM COMPARISON</span>
-        <span className="text-xs" style={{ color: '#555' }}>
+        <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
           Same topic, ranked differently per platform
         </span>
       </div>
 
       {loading && (
-        <div className="text-xs py-4" style={{ color: '#555' }}>
+        <div className="text-xs py-4" style={{ color: 'var(--text-tertiary)' }}>
           Scoring across all platforms...
         </div>
       )}
 
-      <div className="grid grid-cols-4 gap-0 border" style={{ borderColor: '#1C1C1C' }}>
+      <div className="grid grid-cols-4 gap-0 border" style={{ borderColor: 'var(--border)' }}>
         {ALL_PLATFORMS.map((platform, pi) => {
           const data = results[platform]
           const tags = data?.ranked_tags || []
           return (
-            <div key={platform} className={pi < 3 ? 'border-r' : ''} style={{ borderColor: '#1C1C1C' }}>
-              <div className="px-3 py-2 border-b text-xs font-medium" style={{ borderColor: '#1C1C1C', backgroundColor: '#0F0F0F', color: 'var(--text)' }}>
+            <div key={platform} className={pi < 3 ? 'border-r' : ''} style={{ borderColor: 'var(--border)' }}>
+              <div className="px-3 py-2 border-b text-xs font-medium" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--surface)', color: 'var(--text)' }}>
                 {platform}
               </div>
               {tags.slice(0, 8).map((t, i) => {
@@ -70,17 +70,17 @@ export default function PlatformComparison({ topic, product, niche, onSelectTag 
                     onClick={() => onSelectTag && onSelectTag(t)}
                   >
                     <div className="flex items-center gap-1.5 min-w-0">
-                      <span className="text-xs" style={{ color: '#444' }}>{i + 1}</span>
+                      <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{i + 1}</span>
                       <span className="text-xs truncate" style={{ color: 'var(--text)' }}>{label}</span>
                     </div>
-                    <span className="text-xs flex-shrink-0 ml-1" style={{ color: '#555' }}>
+                    <span className="text-xs flex-shrink-0 ml-1" style={{ color: 'var(--text-tertiary)' }}>
                       {formatScore(finalScore)}
                     </span>
                   </div>
                 )
               })}
               {tags.length === 0 && !loading && (
-                <div className="px-3 py-4 text-xs" style={{ color: '#444' }}>No results</div>
+                <div className="px-3 py-4 text-xs" style={{ color: 'var(--text-muted)' }}>No results</div>
               )}
             </div>
           )
