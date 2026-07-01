@@ -25,13 +25,15 @@ def test_full_startup():
     load_weights()
 
     # Step 4: User signup
-    user = signup("test@example.com", "secret123")
+    import time
+    mig_email = f"mig_test_{int(time.time()*1000)}@example.com"
+    user = signup(mig_email, "secret123")
     assert user["user_id"] > 0
-    assert user["email"] == "test@example.com"
+    assert user["email"] == mig_email
     print(f"  ✓ User signup: id={user['user_id']}")
 
     # Step 5: Login
-    auth = authenticate("test@example.com", "secret123")
+    auth = authenticate(mig_email, "secret123")
     assert auth["user_id"] == user["user_id"]
     print(f"  ✓ User login: id={auth['user_id']}")
 
