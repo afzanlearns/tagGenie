@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api'
+import { getRecommendationLabel, formatScore, safeNumber } from '../recommendation'
 
 const ALL_PLATFORMS = ['LinkedIn', 'Instagram', 'X', 'TikTok']
 
@@ -24,9 +25,9 @@ export default function PlatformComparison({ topic, product, niche, onSelectTag 
       all.forEach(({ platform, data }) => { byPlatform[platform] = data })
       setResults(byPlatform)
 
-      const first = all[0]?.data?.ranked_tags?.map(t => t.tag) || []
+      const first = all[0]?.data?.ranked_tags?.map(t => getRecommendationLabel(t)) || []
       const shared = first.filter(tag =>
-        all.every(r => r.data?.ranked_tags?.some(t => t.tag === tag))
+        all.every(r => r.data?.ranked_tags?.some(t => getRecommendationLabel(t) === tag))
       )
       setSharedTags(shared)
       setLoading(false)
@@ -72,8 +73,9 @@ export default function PlatformComparison({ topic, product, niche, onSelectTag 
                 {platform}
               </div>
               {tags.slice(0, 8).map((t, i) => {
-                const firstRank = tags.findIndex(x => x.tag === t.tag)
-                const isShared = sharedTags.includes(t.tag)
+                const label = getRecommendationLabel(t)
+                const isShared = sharedTags.includes(label)
+                const finalScore = safeNumber(t?.final_score)
                 return (
                   <div
                     key={i}
@@ -84,11 +86,11 @@ export default function PlatformComparison({ topic, product, niche, onSelectTag 
                     <div className="flex items-center gap-1.5 min-w-0">
                       <span className="text-xs" style={{ color: '#444' }}>{i + 1}</span>
                       <span className="text-xs truncate" style={{ color: isShared ? 'var(--accent)' : 'var(--text)' }}>
-                        {t.tag}
+                        {label}
                       </span>
                     </div>
                     <span className="text-xs flex-shrink-0 ml-1" style={{ color: '#555' }}>
-                      {t.final_score.toFixed(0)}
+                      {formatScore(finalScore)}
                     </span>
                   </div>
                 )

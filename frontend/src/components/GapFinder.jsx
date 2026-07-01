@@ -1,8 +1,12 @@
 import MetricBar from './MetricBar'
+import { getRecommendationLabel, getRecommendationType, safeNumber } from '../recommendation'
 
 const getReason = (gap) => {
-  const isHashtag = gap.type === 'hashtag'
-  return gap.reason || `${isHashtag ? '#' : 'kw'} High relevance (${(gap.semantic_relevance || 0).toFixed(0)}) + trend (${(gap.trend_score || 0).toFixed(0)}) + low saturation (${(gap.competition_score || 0).toFixed(0)}) — blue ocean`
+  const semRel = safeNumber(gap?.semantic_relevance)
+  const trend = safeNumber(gap?.trend_score)
+  const comp = safeNumber(gap?.competition_score)
+  const isHashtag = getRecommendationType(gap) === 'hashtag'
+  return gap?.reason || `${isHashtag ? '#' : 'kw'} High relevance (${semRel.toFixed(0)}) + trend (${trend.toFixed(0)}) + low saturation (${comp.toFixed(0)}) — blue ocean`
 }
 
 export default function GapFinder({ gaps }) {
@@ -27,7 +31,12 @@ export default function GapFinder({ gaps }) {
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {gaps.map((gap, i) => {
-          const oppScore = ((gap.semantic_relevance || 0) * (gap.trend_score || 0) * (100 - (gap.competition_score || 0)) / 10000).toFixed(0)
+          const semRel = safeNumber(gap?.semantic_relevance)
+          const trend = safeNumber(gap?.trend_score)
+          const comp = safeNumber(gap?.competition_score)
+          const oppScore = (semRel * trend * (100 - comp) / 10000).toFixed(0)
+          const label = getRecommendationLabel(gap)
+          const type = getRecommendationType(gap)
           return (
             <div
               key={i}
@@ -43,7 +52,7 @@ export default function GapFinder({ gaps }) {
                     className="text-sm font-medium"
                     style={{ color: i === 0 ? 'var(--accent)' : 'var(--text)' }}
                   >
-                    {gap.type === 'hashtag' ? '#' : ''}{gap.tag}
+                    {type === 'hashtag' ? '#' : ''}{label}
                   </div>
                   <div className="text-xs mt-1" style={{ color: '#555' }}>{getReason(gap)}</div>
                 </div>
@@ -53,9 +62,9 @@ export default function GapFinder({ gaps }) {
                 </div>
               </div>
               <div className="space-y-1.5">
-                <MetricBar label="Relevance" value={gap.semantic_relevance || 0} />
-                <MetricBar label="Trend" value={gap.trend_score || 0} />
-                <MetricBar label="Competition" value={gap.competition_score || 0} color="#555" />
+                <MetricBar label="Relevance" value={semRel} />
+                <MetricBar label="Trend" value={trend} />
+                <MetricBar label="Competition" value={comp} color="#555" />
               </div>
             </div>
           )

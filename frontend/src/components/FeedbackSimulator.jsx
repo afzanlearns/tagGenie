@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { api } from '../api'
+import { getRecommendationLabel } from '../recommendation'
 
 export default function FeedbackSimulator({ tags, platform, niche = 'gps-telematics' }) {
   const [feedbackSent, setFeedbackSent] = useState(false)
@@ -7,7 +8,7 @@ export default function FeedbackSimulator({ tags, platform, niche = 'gps-telemat
 
   const simFeedback = async () => {
     if (!tags || tags.length === 0) return
-    const selectedTags = tags.slice(0, 3).map(t => t.tag)
+    const selectedTags = tags.slice(0, 3).map(t => getRecommendationLabel(t))
     const engagement = {
       likes: Math.floor(Math.random() * 200) + 10,
       shares: Math.floor(Math.random() * 50) + 1,

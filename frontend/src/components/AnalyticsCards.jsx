@@ -1,18 +1,14 @@
+import { safeNumber } from '../recommendation'
+
 export default function AnalyticsCards({ results }) {
   if (!results || !results.ranked_tags) return null
 
   const tags = results.ranked_tags
   const gaps = results.gap_tags || []
 
-  const avgRel = tags.reduce((s, t) => s + (t.semantic_relevance || 0), 0) / tags.length
-  const avgTrend = tags.reduce((s, t) => s + (t.trend_score || 0), 0) / tags.length
-  const avgComp = tags.reduce((s, t) => s + (t.competition_score || 0), 0) / tags.length
-  const avgPlat = tags.reduce((s, t) => s + (t.platform_fit || 0), 0) / tags.length
-  const platformDist = {}
-  tags.forEach(t => {
-    const p = t.platform_fit >= 60 ? 'Strong' : t.platform_fit >= 30 ? 'Moderate' : 'Weak'
-    platformDist[p] = (platformDist[p] || 0) + 1
-  })
+  const avgRel = tags.reduce((s, t) => s + safeNumber(t?.semantic_relevance), 0) / tags.length
+  const avgTrend = tags.reduce((s, t) => s + safeNumber(t?.trend_score), 0) / tags.length
+  const avgComp = tags.reduce((s, t) => s + safeNumber(t?.competition_score), 0) / tags.length
 
   const cards = [
     { label: 'RECOMMENDATIONS', value: tags.length, sub: results.platform },

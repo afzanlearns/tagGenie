@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import DetailsDrawer from './DetailsDrawer'
+import { getRecommendationLabel, getRecommendationType, formatScore, safeNumber } from '../recommendation'
 
 export default function ComparisonView({ tagGenieTags, baselineTags, gapTags }) {
   const [selectedTag, setSelectedTag] = useState(null)
-  const gapSet = new Set((gapTags || []).map(g => g.tag))
+  const gapSet = new Set((gapTags || []).map(g => getRecommendationLabel(g)))
 
   const maxRows = Math.max(tagGenieTags.length, baselineTags.length)
 
@@ -39,7 +40,7 @@ export default function ComparisonView({ tagGenieTags, baselineTags, gapTags }) 
                       <span className="text-xs" style={{ color: '#444', flexShrink: 0 }}>
                         {i + 1}
                       </span>
-                      {gapSet.has(tag.tag) && (
+                      {gapSet.has(getRecommendationLabel(tag)) && (
                         <span className="text-xs" style={{ color: 'var(--accent)', flexShrink: 0 }} title="Blue ocean gap">
                           ◆
                         </span>
@@ -52,19 +53,19 @@ export default function ComparisonView({ tagGenieTags, baselineTags, gapTags }) 
                             fontWeight: i === 0 ? 700 : 400,
                           }}
                         >
-                          {tag.type === 'hashtag' ? '#' : ''}{tag.tag}
+                          {getRecommendationType(tag) === 'hashtag' ? '#' : ''}{getRecommendationLabel(tag)}
                         </span>
                         <div className="flex gap-2 text-xs mt-0.5" style={{ color: '#555' }}>
-                          <span style={{ color: pctColor(tag.semantic_relevance) }}>R:{formatNum(tag.semantic_relevance)}</span>
-                          <span style={{ color: pctColor(tag.trend_score) }}>T:{formatNum(tag.trend_score)}</span>
-                          <span style={{ color: pctColor(100 - tag.competition_score) }}>C:{formatNum(tag.competition_score)}</span>
-                          <span style={{ color: pctColor(tag.platform_fit) }}>P:{formatNum(tag.platform_fit)}</span>
+                          <span style={{ color: pctColor(safeNumber(tag?.semantic_relevance)) }}>R:{formatScore(safeNumber(tag?.semantic_relevance))}</span>
+                          <span style={{ color: pctColor(safeNumber(tag?.trend_score)) }}>T:{formatScore(safeNumber(tag?.trend_score))}</span>
+                          <span style={{ color: pctColor(100 - safeNumber(tag?.competition_score)) }}>C:{formatScore(safeNumber(tag?.competition_score))}</span>
+                          <span style={{ color: pctColor(safeNumber(tag?.platform_fit)) }}>P:{formatScore(safeNumber(tag?.platform_fit))}</span>
                         </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0 ml-2">
                       <span className="text-xs" style={{ color: '#888' }}>
-                        {tag.final_score.toFixed(0)}
+                        {formatScore(safeNumber(tag?.final_score))}
                       </span>
                     </div>
                   </>
@@ -99,16 +100,16 @@ export default function ComparisonView({ tagGenieTags, baselineTags, gapTags }) 
                       </span>
                       <div className="flex flex-col min-w-0">
                         <span className="text-sm truncate" style={{ color: '#888' }}>
-                          {tag.type === 'hashtag' ? '#' : ''}{tag.tag}
+                          {getRecommendationType(tag) === 'hashtag' ? '#' : ''}{getRecommendationLabel(tag)}
                         </span>
                         <span className="text-xs mt-0.5" style={{ color: '#555' }}>
-                          R:{formatNum(tag.semantic_relevance)}
+                          R:{formatScore(safeNumber(tag?.semantic_relevance))}
                         </span>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0 ml-2">
                       <span className="text-xs" style={{ color: '#666' }}>
-                        {tag.score.toFixed(0)}
+                        {formatScore(safeNumber(tag?.score))}
                       </span>
                     </div>
                   </>
@@ -134,11 +135,6 @@ export default function ComparisonView({ tagGenieTags, baselineTags, gapTags }) 
       )}
     </div>
   )
-}
-
-function formatNum(v) {
-  if (v == null) return '—'
-  return v.toFixed(0)
 }
 
 function pctColor(v) {

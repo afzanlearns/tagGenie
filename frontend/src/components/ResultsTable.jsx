@@ -1,17 +1,7 @@
 import { useState } from 'react'
 import ScoreBar from './ScoreBar'
 import DetailsDrawer from './DetailsDrawer'
-
-function guessCategory(tag) {
-  const t = tag.toLowerCase()
-  if (tag.type === 'hashtag') return 'Hashtag'
-  if (t.endsWith('industry') || t.includes('sector') || t.includes('market') || t.includes('supply chain')) return 'Industry'
-  if (t.includes('brand') || t.endsWith('pro') || t.includes('product')) return 'Brand'
-  if (t.includes('lover') || t.includes('enthusiast') || t.includes('community') || t.includes('farmer') || t.includes('buyer') || t.includes('professional')) return 'Audience'
-  if (t.includes('trend') || t.includes('innovation') || t.includes('future') || t.includes('best') || t.includes('top')) return 'Topic'
-  if (t.includes('roast') || t.includes('brew') || t.includes('process') || t.includes('grade') || t.includes('certification')) return 'Process'
-  return 'Industry'
-}
+import { getRecommendationLabel, getRecommendationType, getCategory, formatScore, formatScoreOne, safeNumber } from '../recommendation'
 
 export default function ResultsTable({ tags }) {
   const [selectedTag, setSelectedTag] = useState(null)
@@ -39,7 +29,14 @@ export default function ResultsTable({ tags }) {
           </thead>
           <tbody>
             {tags.map((tag, i) => {
-              const cat = guessCategory(tag)
+              const label = getRecommendationLabel(tag)
+              const type = getRecommendationType(tag)
+              const cat = getCategory(tag)
+              const finalScore = safeNumber(tag?.final_score)
+              const semRel = safeNumber(tag?.semantic_relevance)
+              const trend = safeNumber(tag?.trend_score)
+              const comp = safeNumber(tag?.competition_score)
+              const plat = safeNumber(tag?.platform_fit)
               return (
                 <tr
                   key={i}
@@ -51,10 +48,10 @@ export default function ResultsTable({ tags }) {
                 >
                   <td className="py-2.5 pr-3" style={{ color: '#444' }}>{i + 1}</td>
                   <td className="py-2.5 pr-3" style={{ color: 'var(--text)', fontWeight: i === 0 ? 700 : 400 }}>
-                    {tag.final_score > 70 && (
+                    {finalScore > 70 && (
                       <span style={{ color: 'var(--accent)' }}>● </span>
                     )}
-                    {tag.tag}
+                    {type === 'hashtag' ? '#' : ''}{label}
                   </td>
                   <td className="py-2.5 pr-3">
                     <span className="text-xs px-1.5 py-0.5" style={{ backgroundColor: '#141414', color: '#888', border: '1px solid #2A2A2A', fontSize: '10px' }}>
@@ -62,22 +59,22 @@ export default function ResultsTable({ tags }) {
                     </span>
                   </td>
                   <td className="py-2.5 pr-3 text-right" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                    {tag.final_score.toFixed(1)}
+                    {formatScoreOne(finalScore)}
                   </td>
                   <td className="py-2.5 pr-3 text-right" style={{ color: '#888', fontVariantNumeric: 'tabular-nums' }}>
-                    {(tag.semantic_relevance || 0).toFixed(0)}
+                    {formatScore(semRel)}
                   </td>
                   <td className="py-2.5 pr-3 text-right" style={{ color: '#888', fontVariantNumeric: 'tabular-nums' }}>
-                    {(tag.trend_score || 0).toFixed(0)}
+                    {formatScore(trend)}
                   </td>
                   <td className="py-2.5 pr-3 text-right" style={{ color: '#888', fontVariantNumeric: 'tabular-nums' }}>
-                    {(tag.competition_score || 0).toFixed(0)}
+                    {formatScore(comp)}
                   </td>
                   <td className="py-2.5 pr-3 text-right" style={{ color: '#888', fontVariantNumeric: 'tabular-nums' }}>
-                    {(tag.platform_fit || 0).toFixed(0)}
+                    {formatScore(plat)}
                   </td>
                   <td className="py-2.5">
-                    <ScoreBar value={tag.final_score} max={100} />
+                    <ScoreBar value={finalScore} max={100} />
                   </td>
                 </tr>
               )
