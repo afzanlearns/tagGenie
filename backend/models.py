@@ -9,11 +9,12 @@ CATEGORIES = [
 ]
 
 CONFIDENCE_BANDS = [
-    (90, 100, "Excellent"),
-    (80, 89, "Very Strong"),
-    (70, 79, "Strong"),
-    (60, 69, "Moderate"),
-    (0, 59, "Weak"),
+    (95, 100, "Elite"),
+    (85, 94, "Excellent"),
+    (75, 84, "Very Strong"),
+    (65, 74, "Strong"),
+    (55, 64, "Moderate"),
+    (0, 54, "Weak"),
 ]
 
 def confidence_band(score: float) -> str:
@@ -47,6 +48,8 @@ class CandidateTag(BaseModel):
     is_blue_ocean: bool = False
     is_hidden_gem: bool = False
     is_high_competition: bool = False
+    score_breakdown: dict = {}
+    quality_labels: list[str] = []
 
 
 class GapTag(BaseModel):
