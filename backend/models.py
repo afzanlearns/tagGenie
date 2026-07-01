@@ -2,19 +2,20 @@ from pydantic import BaseModel
 from typing import Optional, Literal
 from datetime import datetime
 
-VALID_PLATFORMS = {"LinkedIn", "Instagram", "X", "TikTok"}
+VALID_PLATFORMS = {"LinkedIn", "Instagram", "X", "TikTok", "Pinterest"}
 
 CATEGORIES = [
     "Product", "Hashtag", "Industry Term", "Audience", "Topic", "Brand", "Keyword"
 ]
 
 CONFIDENCE_BANDS = [
-    (95, 100, "Elite"),
-    (85, 94, "Excellent"),
-    (75, 84, "Very Strong"),
-    (65, 74, "Strong"),
-    (55, 64, "Moderate"),
-    (0, 54, "Weak"),
+    (90, 100, "Elite"),
+    (80, 89, "Excellent"),
+    (70, 79, "Very Strong"),
+    (60, 69, "Strong"),
+    (50, 59, "Moderate"),
+    (40, 49, "Fair"),
+    (0, 39, "Weak"),
 ]
 
 def confidence_band(score: float) -> str:
@@ -27,7 +28,7 @@ def confidence_band(score: float) -> str:
 class ScoreRequest(BaseModel):
     topic: str
     product: str
-    platform: Literal["LinkedIn", "Instagram", "X", "TikTok"]
+    platform: Literal["LinkedIn", "Instagram", "X", "TikTok", "Pinterest"]
     niche: str = "gps-telematics"
     include_baseline: bool = False
 
@@ -140,7 +141,7 @@ class EngagementMetrics(BaseModel):
 
 class FeedbackRequest(BaseModel):
     post_id: str
-    platform: Literal["LinkedIn", "Instagram", "X", "TikTok"]
+    platform: Literal["LinkedIn", "Instagram", "X", "TikTok", "Pinterest"]
     tags_used: list[str]
     engagement: EngagementMetrics
     niche: str = "gps-telematics"

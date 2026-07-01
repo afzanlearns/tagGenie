@@ -356,6 +356,30 @@ def get_dashboard_stats(user_id: str) -> dict:
         (user_id,),
     ).fetchone()[0] or 0
 
+    top_saved_niche_row = conn.execute(
+        """SELECT niche, COUNT(*) as cnt FROM saved_sets
+           WHERE user_id = ? GROUP BY niche ORDER BY cnt DESC LIMIT 1""",
+        (user_id,),
+    ).fetchone()
+    top_saved_niche = top_saved_niche_row[0] if top_saved_niche_row else None
+
+    most_common_cat_row = conn.execute(
+        """SELECT s.value FROM (
+               SELECT json_extract(data, '$.category') as value, COUNT(*) as cnt
+               FROM recommendation_history, json_each(data, '$.ranked_tags')
+               WHERE user_id = ? AND json_extract(data, '$.ranked_tags') IS NOT NULL
+               GROUP BY value ORDER BY cnt DESC LIMIT 1
+           ) s""",
+        (user_id,),
+    ).fetchone()
+    most_common_category = most_common_cat_row[0] if most_common_cat_row else None
+
+    avg_bo = conn.execute(
+        """SELECT COALESCE(AVG(CAST(json_extract(data, '$.analytics.blue_ocean_count') AS REAL)), 0)
+           FROM recommendation_history WHERE user_id = ?""",
+        (user_id,),
+    ).fetchone()[0] or 0.0
+
     history_timeline = conn.execute(
         """SELECT created_at, topic, platform, tag_count, confidence
            FROM recommendation_history WHERE user_id = ?
@@ -373,6 +397,9 @@ def get_dashboard_stats(user_id: str) -> dict:
         "most_used_platform": most_used_platform,
         "most_used_niche": most_used_niche,
         "average_confidence": round(avg_conf, 1),
+        "average_blue_ocean_score": round(avg_bo, 1),
+        "most_common_category": most_common_category,
+        "top_saved_niche": top_saved_niche,
         "history_timeline": [
             {"created_at": r[0], "topic": r[1], "platform": r[2],
              "tag_count": r[3], "confidence": r[4]}

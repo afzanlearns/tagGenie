@@ -94,16 +94,31 @@ PLATFORM_PROFILES: dict[str, dict] = {
             "Industry Term": 8, "Audience": 0, "Keyword": 5,
         },
     },
+    "Pinterest": {
+        "base_hashtag": 0.8,
+        "base_keyword": 0.6,
+        "boost_patterns": [
+            (r"(inspiration|ideas|diy|tutorial|guide|howto|step.?by.?step)$", 30),
+            (r"^(decor|recipe|craft|style|design|organize|plan)", 25),
+            (r"(aesthetic|minimalist|boho|modern|rustic|vintage)", 22),
+            (r"(collection|moodboard|vision.?board|wishlist|favorite)", 20),
+            (r"(home|garden|wedding|party|seasonal|holiday)", 18),
+        ],
+        "category_boosts": {
+            "Hashtag": 15, "Topic": 12, "Audience": 8, "Keyword": 5,
+            "Industry Term": -10, "Brand": 5,
+        },
+    },
 }
 
 # ---------------------------------------------------------------------------
 # weights  —  platform is now the strongest signal
 # ---------------------------------------------------------------------------
 
-W_REL = 0.30
-W_TREND = 0.12
-W_LOW_COMP = 0.13
-W_PLATFORM = 0.40
+W_REL = 0.28
+W_TREND = 0.10
+W_LOW_COMP = 0.20
+W_PLATFORM = 0.37
 W_CONF = 0.05
 
 # ---------------------------------------------------------------------------
@@ -198,6 +213,43 @@ def compute_profile_confidence(niche_id: str, user_id: str | None = None) -> flo
     if corpus_size >= 100:
         score += 15
     return round(min(100.0, score), 1)
+
+
+# ---------------------------------------------------------------------------
+# 6a  global brand blacklist  (for blue ocean)
+# ---------------------------------------------------------------------------
+
+GLOBAL_BRANDS: set[str] = {
+    "tesla", "apple", "google", "amazon", "nike", "microsoft", "meta",
+    "netflix", "spotify", "youtube", "instagram", "facebook", "twitter",
+    "linkedin", "tiktok", "snapchat", "pinterest", "uber", "airbnb",
+    "disney", "coca", "pepsi", "mcdonald", "starbucks", "walmart",
+    "target", "costco", "samsung", "sony", "panasonic", "lg", "intel",
+    "amd", "nvidia", "adobe", "salesforce", "oracle", "ibm", "cisco",
+    "dell", "hp", "canon", "nike", "adidas", "puma", "gucci", "prada",
+    "chanel", "louisvuitton", "zara", "hm", "ikea", "nintendo", "playstation",
+    "xbox", "reddit", "discord", "zoom", "slack", "notion", "figma",
+    "stripe", "paypal", "shopify", "wordpress", "github", "gitlab",
+}
+
+LOCAL_BRAND_WORDS: set[str] = {
+    "tesla", "apple", "google", "amazon", "nike", "microsoft", "meta",
+    "netflix", "spotify", "youtube", "uber", "disney", "samsung",
+    "nvidia", "adobe", "salesforce", "oracle", "ibm", "intel",
+    "paypal", "shopify", "github", "reddit", "discord", "zoom",
+}
+
+
+def _is_global_brand(tag: str) -> bool:
+    """Check if tag refers to a globally dominant brand."""
+    t = _normalize_tag(tag)
+    if t in GLOBAL_BRANDS:
+        return True
+    words = t.split()
+    for w in words:
+        if w in LOCAL_BRAND_WORDS:
+            return True
+    return False
 
 
 # ---------------------------------------------------------------------------
@@ -298,7 +350,7 @@ def _quality_labels(c: dict, platform: str) -> list[str]:
     tr = c["trend_score"]
     comp = c["competition_score"]
     fit = c["platform_fit"]
-    final = c["final_score"]
+    tag = c.get("tag", "")
 
     if rel >= 80:
         labels.append("Excellent Match")
@@ -307,12 +359,14 @@ def _quality_labels(c: dict, platform: str) -> list[str]:
 
     if tr >= 70:
         labels.append("Trending")
-    elif tr >= 50:
+    elif tr >= 55:
         labels.append("Rising")
+    elif tr >= 40 and comp <= 35:
+        labels.append("Emerging")
 
-    if comp <= 25:
+    if comp <= 20:
         labels.append("Low Competition")
-    elif comp <= 40:
+    elif comp <= 35:
         labels.append("Moderate Competition")
 
     if fit >= 80:
@@ -325,40 +379,55 @@ def _quality_labels(c: dict, platform: str) -> list[str]:
     if c.get("is_hidden_gem"):
         labels.append("Hidden Gem")
 
-    if c.get("category") == "Industry Term" and platform == "LinkedIn":
-        labels.append("Professional Term")
-    if c.get("category") == "Hashtag" and platform in ("Instagram", "TikTok"):
+    if c.get("category") == "Industry Term":
+        if platform == "LinkedIn":
+            labels.append("Professional Term")
+        else:
+            labels.append("Technical")
+    elif c.get("category") == "Brand":
+        labels.append("Brand Label")
+    elif c.get("category") == "Hashtag" and platform in ("Instagram", "TikTok"):
         labels.append("Creator Friendly")
 
-    if c["opportunity_score"] > 20 and comp < 35:
-        labels.append("Emerging")
+    # Long tail: high relevance + low competition + moderate/rising trend
+    if rel > 50 and comp < 35 and 30 <= tr <= 65:
+        labels.append("Long Tail")
 
-    return labels[:4]
+    if rel > 55 and comp < 40 and tr < 30:
+        labels.append("Evergreen")
+
+    # Remove contradictions:
+    if "Low Competition" in labels and "Moderate Competition" in labels:
+        labels.remove("Moderate Competition")
+    if "Blue Ocean" in labels and "Hidden Gem" in labels:
+        labels.remove("Hidden Gem")
+
+    return labels[:3]
 
 
 # ---------------------------------------------------------------------------
-# 9  explanation generator  (rich bullet-point)
+# 9  explanation generator  (analyst language, multiple templates)
 # ---------------------------------------------------------------------------
 
 _SEMANTIC_DESC = {
-    80: "Excellent semantic match with your niche profile",
-    60: "Good semantic alignment with the query",
-    40: "Moderate semantic connection to the topic",
-    0: "Limited semantic relevance",
+    80: "This term has excellent semantic alignment with your niche profile",
+    60: "Good semantic match — relevant to your core topic and product offering",
+    40: "Moderate thematic connection to your niche; not a direct match but adjacent",
+    0: "Limited semantic relevance — may resonate more in adjacent niches",
 }
 
 _TREND_DESC = {
-    70: "Frequently searched within your selected platform",
-    50: "Growing interest detected in recent data",
-    30: "Moderate trending signals present",
-    0: "Lower trending activity currently",
+    70: "Demand signals are strong with consistent search volume and growing interest",
+    55: "Moderate-to-rising trend momentum detected across recent data",
+    40: "Steady but not explosive — reliable performer rather than breakout candidate",
+    0: "Low trending activity currently; minimal organic discovery potential",
 }
 
 _COMP_DESC = {
-    75: "Competition is considerably lower than similar alternatives",
-    50: "Competition levels are manageable",
-    30: "Moderate competition from existing content",
-    0: "High competition — very saturated space",
+    75: "Competition is remarkably low — this space is underserved by existing content",
+    55: "Competition is manageable — there is room to establish authority without fighting for saturation",
+    35: "Moderate competition — content exists but the field is not fully crowded",
+    0: "Heavily saturated — many content pieces already competing for the same terms",
 }
 
 _PLATFORM_DESC = {
@@ -386,6 +455,12 @@ _PLATFORM_DESC = {
         40: "Average fit for X's platform dynamics",
         0: "Not ideal for X's concise, timely content model",
     },
+    "Pinterest": {
+        80: "Naturally aligned with Pinterest's visual discovery and inspiration-driven ecosystem",
+        60: "Performs well within Pinterest's collection and idea-sharing format",
+        40: "Moderate fit for Pinterest's aesthetic-focused platform",
+        0: "Suboptimal — this tag type underperforms on Pinterest's visual discovery model",
+    },
 }
 
 
@@ -396,6 +471,7 @@ def _band_desc(band: str) -> str:
         "Very Strong": "Very Strong — high ranking confidence",
         "Strong": "Strong — solid ranking confidence",
         "Moderate": "Moderate — adequate ranking confidence",
+        "Fair": "Fair — moderate ranking confidence",
         "Weak": "Weak — lower ranking confidence",
     }.get(band, "Standard ranking confidence")
 
@@ -406,7 +482,8 @@ def generate_explanation(
     rank: int, total: int, platform: str, category: str,
     band: str, opp_score: float, quality_labels: list[str],
 ) -> str:
-    parts = []
+    import random as _r
+    _r.seed(hash(tag) % (2**31))
 
     def _desc(mapping: dict, value: float) -> str:
         for threshold, desc in sorted(mapping.items(), reverse=True):
@@ -414,41 +491,59 @@ def generate_explanation(
                 return desc
         return list(mapping.values())[-1]
 
-    parts.append(f"Recommendation #{rank}: {tag}")
-
     rel_desc = _desc(_SEMANTIC_DESC, semantic_relevance)
-    parts.append(f"• {rel_desc} ({semantic_relevance:.0f}/100).")
-
     trend_desc = _desc(_TREND_DESC, trend_score)
-    parts.append(f"• {trend_desc} ({trend_score:.0f}/100).")
-
-    comp_desc = _desc(_COMP_DESC, competition_score)
-    comp_inv = _desc(_COMP_DESC, 100 - competition_score)
-    if competition_score < 40:
-        parts.append(f"• {comp_desc} ({competition_score:.0f}/100).")
-    else:
-        parts.append(f"• {comp_inv} ({competition_score:.0f}/100).")
-
+    comp_score_val = competition_score
+    comp_desc = _desc(_COMP_DESC, 100 - comp_score_val) if comp_score_val < 40 else _desc(_COMP_DESC, comp_score_val)
     plat_map = _PLATFORM_DESC.get(platform, _PLATFORM_DESC["X"])
     plat_desc = _desc(plat_map, platform_fit)
-    parts.append(f"• {plat_desc} ({platform_fit:.0f}/100).")
+
+    # Analyst templates
+    if rank <= 3:
+        templates = [
+            f"{rel_desc}. {trend_desc.lower()}. {comp_desc.lower()} This combination makes it a {"strong top-tier" if rank==1 else "solid high-ranking"} recommendation for {platform}.",
+            f"{tag}: {rel_desc.lower()}. On {platform}, {plat_desc.lower()}. With {_desc(_COMP_DESC, 100-comp_score_val).lower()}, this term stands out from alternatives.",
+            f"This {"industry term" if category=="Industry Term" else "keyword" if category=="Keyword" else "tag"} {"matches your niche exceptionally well" if semantic_relevance>70 else "is relevant to your niche"}. The trend profile suggests {trend_desc.lower()} and the competitive landscape is {comp_desc.lower()}.",
+        ]
+    elif rank <= 6:
+        templates = [
+            f"{rel_desc}. {trend_desc}. Competition analysis: {comp_desc}. On {platform}, {plat_desc}.",
+            f"{tag} combines {f"strong relevance ({semantic_relevance:.0f})" if semantic_relevance>60 else f"adequate relevance ({semantic_relevance:.0f})"} with {f"healthy demand signals ({trend_score:.0f})" if trend_score>50 else f"stable demand ({trend_score:.0f})"} and {f"low saturation ({comp_score_val:.0f})" if comp_score_val<40 else f"moderate saturation ({comp_score_val:.0f})"}.",
+        ]
+    else:
+        templates = [
+            f"{rel_desc}. {trend_desc}. {comp_desc}.",
+            f"{tag}: relevance {semantic_relevance:.0f}, demand {trend_score:.0f}, saturation {comp_score_val:.0f}. Platform fit for {platform}: {platform_fit:.0f}.",
+        ]
+
+    parts = [templates[_r.randint(0, len(templates)-1)]]
 
     if category:
-        parts.append(f"• Categorized as {category} — aligns with the '{category}' segment of your niche profile.")
-
-    band_label = _band_desc(band)
-    parts.append(f"• Confidence: {band} — {band_label}.")
+        joiners = ["Sits in the", "Categorized under", "Belongs to the"]
+        parts.append(f"{_r.choice(joiners)} {category} segment." if _r.random()>0.3 else f"Fits into the {category} category.")
 
     if quality_labels:
-        parts.append(f"• Indicators: {', '.join(quality_labels)}.")
+        parts.append(f"Quality signals: {', '.join(quality_labels)}.")
 
-    if opp_score > 15:
-        parts.append(f"• Opportunity score {opp_score:.0f} — qualifies as a blue ocean opportunity with first-mover potential.")
+    if opp_score > 12:
+        phrases = [
+            f"Opportunity score {opp_score:.0f} — early-mover advantage in an emerging space.",
+            f"With an opportunity score of {opp_score:.0f}, this term represents attractive first-mover potential.",
+            f"Scored {opp_score:.0f} on opportunity — positioning ahead of the curve.",
+        ]
+        parts.append(_r.choice(phrases))
 
-    if rank <= 3:
-        parts.append(f"• Recommended alongside complementary terms for broader content reach.")
+    avg = (semantic_relevance + trend_score + platform_fit + (100 - comp_score_val)) / 4
+    if avg > 60:
+        closing = [
+            "A well-rounded recommendation with balanced signals across all dimensions.",
+            "Strong multi-signal candidate — performs well on relevance, demand, and platform fit.",
+            "Solid all-around performer with no significant weak points in the scoring profile.",
+        ]
+        if _r.random() > 0.5:
+            parts.append(_r.choice(closing))
 
-    return "\n".join(parts)
+    return " ".join(parts)
 
 
 # ---------------------------------------------------------------------------
@@ -570,8 +665,15 @@ def rank_candidates(
         tag_type = c["type"]
         tag_name = c["tag"]
 
-        is_bo = opp > 12.0 and comp < 45 and tr > 45
-        is_hg = rel > 55 and comp < 35 and tr < 50 and not is_bo
+        # Blue ocean: niche opportunities with first-mover potential
+        is_global = _is_global_brand(tag_name)
+        is_long_tail = len(tag_name.split()) >= 3
+        is_tech_term = cat == "Industry Term" and any(w in tag_name.lower() for w in ["tech", "ai", "ml", "data", "cloud", "api", "saas", "system", "platform", "solution", "software", "digital", "automation", "analytics"])
+        is_audience_focused = cat == "Audience" or any(w in tag_name.lower() for w in ["for", "professional", "developer", "creator", "founder", "designer", "engineer"])
+
+        # Blue ocean: high opp, low comp, not global brands
+        is_bo = (opp > 10.0 and comp < 45 and tr > 40 and not is_global) or (is_long_tail and opp > 8.0 and comp < 40) or (is_tech_term and opp > 8.0 and comp < 45)
+        is_hg = rel > 55 and comp < 35 and tr < 50 and not is_bo and not is_global
         is_hc = comp > 75
 
         c["is_blue_ocean"] = is_bo
@@ -630,6 +732,24 @@ def rank_candidates(
                 high_comp_list.append(HighCompetitionTag(tag=tag_name, type=tag_type, competition_score=comp))
             elif not is_bo and not is_hg and (comp > 60 or rel < 30):
                 rejected_list.append(RejectedCandidateTag(tag=tag_name, type=tag_type, reason=_rejection_reason(rel, tr, comp, fit)))
+
+    # --- lightweight category diversity swap: avoid >3 of the same category in top 10
+    if len(result) >= 6:
+        cat_counts: dict[str, int] = {}
+        for t in result[:DISPLAY_K]:
+            cat = t.category or "Keyword"
+            cat_counts[cat] = cat_counts.get(cat, 0) + 1
+        for idx in range(min(DISPLAY_K, len(result))):
+            cur_cat = result[idx].category or "Keyword"
+            if cat_counts.get(cur_cat, 0) >= 3:
+                for swap_idx in range(idx + 1, len(result)):
+                    swap_cat = result[swap_idx].category or "Keyword"
+                    if cat_counts.get(swap_cat, 0) is not None and cat_counts.get(swap_cat, 0) <= 1:
+                        if swap_idx < DISPLAY_K:
+                            result[idx], result[swap_idx] = result[swap_idx], result[idx]
+                            cat_counts[cur_cat] = cat_counts.get(cur_cat, 0) - 1
+                            cat_counts[swap_cat] = cat_counts.get(swap_cat, 0) + 1
+                        break
 
     ranked_tags = result[:DISPLAY_K]
 
@@ -711,41 +831,36 @@ def rank_candidates(
 def _rejection_reason(rel: float, trend: float, comp: float, plat: float) -> str:
     reasons = []
     if comp > 75:
-        reasons.append("Very high competition")
+        reasons.append("Very high competition makes it difficult to gain visibility")
     if rel < 30:
-        reasons.append("Low semantic relevance")
+        reasons.append("Limited semantic relevance to the chosen niche")
     if plat < 25:
-        reasons.append("Weak platform fit")
+        reasons.append("Weak alignment with platform content dynamics")
     if trend < 20:
-        reasons.append("Insufficient trend data")
+        reasons.append("Insufficient trend momentum to generate organic reach")
     if not reasons:
-        reasons.append("Outranked by stronger candidates")
-    return ". ".join(reasons) + "."
+        reasons.append("Outranked by stronger candidates in the final evaluation")
+    return " ".join(reasons) + ""
 
 
 def _blue_ocean_reason(bo: CandidateTag) -> str:
-    parts = []
-    if bo.semantic_relevance > 70:
-        parts.append("High relevance")
-    else:
-        parts.append("Good relevance")
-    if bo.trend_score > 65:
-        parts.append("strong demand")
-    else:
-        parts.append("moderate demand")
-    if bo.competition_score < 25:
-        parts.append("very low saturation")
-    else:
-        parts.append("low saturation")
-    return f"{', '.join(parts)} ({bo.semantic_relevance:.0f}/{bo.trend_score:.0f}/{bo.competition_score:.0f}) = blue ocean opportunity with first-mover potential"
+    rel_label = "Excellent relevance" if bo.semantic_relevance > 70 else "Strong topical relevance"
+    demand_label = "rising demand" if bo.trend_score > 65 else "consistent demand"
+    sat_label = "minimal saturation" if bo.competition_score < 25 else "low saturation"
+    return (
+        f"{rel_label} ({bo.semantic_relevance:.0f}) + "
+        f"{demand_label} ({bo.trend_score:.0f}) + "
+        f"{sat_label} ({bo.competition_score:.0f}) = "
+        f"blue ocean opportunity with first-mover potential"
+    )
 
 
 def _hidden_gem_reason(hg: CandidateTag) -> str:
     return (
-        f"High relevance ({hg.semantic_relevance:.0f}) + "
-        f"low competition ({hg.competition_score:.0f}) + "
-        f"moderate trend ({hg.trend_score:.0f}) — "
-        f"long-tail opportunity with high future potential"
+        f"Strong topical relevance ({hg.semantic_relevance:.0f}) paired with "
+        f"low competitive pressure ({hg.competition_score:.0f}) and "
+        f"{'moderate' if hg.trend_score < 50 else 'growing'} trend activity ({hg.trend_score:.0f}) "
+        f"— a long-tail opportunity with favorable positioning for future growth"
     )
 
 

@@ -41,7 +41,7 @@ from backend.user_storage import (
 
 _ingested_topics = []
 
-VALID_PLATFORMS = {"LinkedIn", "Instagram", "X", "TikTok"}
+VALID_PLATFORMS = {"LinkedIn", "Instagram", "X", "TikTok", "Pinterest"}
 
 
 @asynccontextmanager
