@@ -1,5 +1,25 @@
 import MetricBar from './MetricBar'
-import { getRecommendationLabel, getRecommendationType, formatScoreOne, safeNumber, confidenceBand, competitionLevel } from '../recommendation'
+import { getRecommendationLabel, getRecommendationType, formatScoreOne, safeNumber, confidenceBand, competitionLevel, qualityLabelColor, copyToClipboard } from '../recommendation'
+
+function ContributionBar({ label, value, color, max }) {
+  const pct = max > 0 ? (value / max) * 100 : 0
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-xs flex-shrink-0" style={{ color: '#555', width: '80px' }}>{label}</span>
+      <div className="flex-1" style={{ backgroundColor: '#141414', height: '6px', position: 'relative' }}>
+        <div style={{
+          width: `${pct}%`,
+          height: '100%',
+          backgroundColor: color || '#555',
+          transition: 'width 0.5s',
+        }} />
+      </div>
+      <span className="text-xs flex-shrink-0 text-right" style={{ color: '#888', width: '24px', fontVariantNumeric: 'tabular-nums' }}>
+        {value.toFixed(1)}
+      </span>
+    </div>
+  )
+}
 
 export default function DetailsDrawer({ tag, onClose }) {
   if (!tag) return null
@@ -19,6 +39,16 @@ export default function DetailsDrawer({ tag, onClose }) {
   const oppScore = safeNumber(tag?.opportunity_score)
   const isBlueOcean = !!tag?.is_blue_ocean
   const isHiddenGem = !!tag?.is_hidden_gem
+  const breakdown = tag?.score_breakdown || {}
+  const qualities = Array.isArray(tag?.quality_labels) ? tag.quality_labels : []
+  const maxContrib = Math.max(
+    safeNumber(breakdown?.semantic_contribution),
+    safeNumber(breakdown?.trend_contribution),
+    safeNumber(breakdown?.competition_contribution),
+    safeNumber(breakdown?.platform_contribution),
+    safeNumber(breakdown?.confidence_contribution),
+    1
+  )
 
   return (
     <div style={{
@@ -35,13 +65,23 @@ export default function DetailsDrawer({ tag, onClose }) {
     }}>
       <div className="flex items-center justify-between mb-6">
         <span className="text-xs font-medium" style={{ color: '#555' }}>RECOMMENDATION DETAILS</span>
-        <button
-          onClick={onClose}
-          className="text-xs px-2 py-1"
-          style={{ backgroundColor: 'transparent', border: '1px solid #333', color: '#888', cursor: 'pointer' }}
-        >
-          ✕
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => copyToClipboard(label)}
+            className="text-xs px-2 py-1"
+            style={{ backgroundColor: 'transparent', border: '1px solid #333', color: '#888', cursor: 'pointer' }}
+            title="Copy tag name"
+          >
+            📋
+          </button>
+          <button
+            onClick={onClose}
+            className="text-xs px-2 py-1"
+            style={{ backgroundColor: 'transparent', border: '1px solid #333', color: '#888', cursor: 'pointer' }}
+          >
+            ✕
+          </button>
+        </div>
       </div>
 
       <div className="mb-4">
@@ -79,6 +119,23 @@ export default function DetailsDrawer({ tag, onClose }) {
         )}
       </div>
 
+      {qualities.length > 0 && (
+        <div className="mb-4">
+          <div className="text-xs font-medium mb-2" style={{ color: '#555' }}>QUALITY INDICATORS</div>
+          <div className="flex flex-wrap gap-1.5">
+            {qualities.map((q, qi) => (
+              <span key={qi} className="text-xs px-2 py-0.5" style={{
+                backgroundColor: `${qualityLabelColor(q)}22`,
+                color: qualityLabelColor(q),
+                border: `1px solid ${qualityLabelColor(q)}44`,
+              }}>
+                {q}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="space-y-3 mb-4">
         <MetricBar label="Final Score" value={finalScore} size="md" />
         <MetricBar label="Semantic Relevance" value={semRel} size="md" />
@@ -90,6 +147,19 @@ export default function DetailsDrawer({ tag, onClose }) {
           <MetricBar label="Opportunity Score" value={oppScore} size="md" color="var(--accent)" />
         )}
       </div>
+
+      {maxContrib > 0 && (
+        <div className="mb-4">
+          <div className="text-xs font-medium mb-2" style={{ color: '#555' }}>SCORE BREAKDOWN</div>
+          <div className="space-y-1">
+            <ContributionBar label="Semantic" value={safeNumber(breakdown?.semantic_contribution)} color="#d42b2b" max={maxContrib} />
+            <ContributionBar label="Trend" value={safeNumber(breakdown?.trend_contribution)} color="#b8860b" max={maxContrib} />
+            <ContributionBar label="Competition" value={safeNumber(breakdown?.competition_contribution)} color="#555" max={maxContrib} />
+            <ContributionBar label="Platform" value={safeNumber(breakdown?.platform_contribution)} color="#4caf50" max={maxContrib} />
+            <ContributionBar label="Confidence" value={safeNumber(breakdown?.confidence_contribution)} color="#8bc34a" max={maxContrib} />
+          </div>
+        </div>
+      )}
 
       {explanation && (
         <div className="mb-4">

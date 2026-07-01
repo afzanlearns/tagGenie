@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import ScoreBar from './ScoreBar'
 import DetailsDrawer from './DetailsDrawer'
-import { getRecommendationLabel, getRecommendationType, getCategory, formatScore, formatScoreOne, safeNumber, confidenceBand } from '../recommendation'
+import { getRecommendationLabel, getRecommendationType, getCategory, formatScore, formatScoreOne, safeNumber, confidenceBand, qualityLabelColor } from '../recommendation'
 
 export default function ResultsTable({ tags }) {
   const [selectedTag, setSelectedTag] = useState(null)
@@ -19,6 +19,7 @@ export default function ResultsTable({ tags }) {
               <th className="text-left py-2 pr-3" style={{ color: '#555', fontWeight: 400 }}>#</th>
               <th className="text-left py-2 pr-3" style={{ color: '#555', fontWeight: 400 }}>TAG</th>
               <th className="text-left py-2 pr-3" style={{ color: '#555', fontWeight: 400 }}>CATEGORY</th>
+              <th className="text-left py-2 pr-3" style={{ color: '#555', fontWeight: 400 }}>QUALITY</th>
               <th className="text-left py-2 pr-3" style={{ color: '#555', fontWeight: 400 }}>BAND</th>
               <th className="text-right py-2 pr-3" style={{ color: '#555', fontWeight: 400 }}>FINAL</th>
               <th className="text-right py-2 pr-3" style={{ color: '#555', fontWeight: 400 }}>REL</th>
@@ -38,6 +39,7 @@ export default function ResultsTable({ tags }) {
               const trend = safeNumber(tag?.trend_score)
               const comp = safeNumber(tag?.competition_score)
               const plat = safeNumber(tag?.platform_fit)
+              const qualities = Array.isArray(tag?.quality_labels) ? tag.quality_labels : []
               return (
                 <tr
                   key={i}
@@ -58,6 +60,21 @@ export default function ResultsTable({ tags }) {
                     <span className="text-xs px-1.5 py-0.5" style={{ backgroundColor: '#141414', color: '#888', border: '1px solid #2A2A2A', fontSize: '10px' }}>
                       {cat}
                     </span>
+                  </td>
+                  <td className="py-2.5 pr-3">
+                    <div className="flex flex-wrap gap-0.5" style={{ maxWidth: '120px' }}>
+                      {qualities.slice(0, 2).map((q, qi) => (
+                        <span key={qi} className="text-xs px-1 py-0.5" style={{
+                          backgroundColor: `${qualityLabelColor(q)}22`,
+                          color: qualityLabelColor(q),
+                          border: `1px solid ${qualityLabelColor(q)}44`,
+                          fontSize: '9px',
+                          lineHeight: '1.2',
+                        }}>
+                          {q}
+                        </span>
+                      ))}
+                    </div>
                   </td>
                   <td className="py-2.5 pr-3">
                     <span className="text-xs px-1.5 py-0.5" style={{
