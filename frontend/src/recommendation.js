@@ -52,3 +52,28 @@ export function competitionLevel(score) {
   if (score >= 35) return { label: 'Moderate', color: '#888' }
   return { label: 'Low', color: '#6a6' }
 }
+
+export function qualityLabelColor(label) {
+  const colors = {
+    'Excellent Match': '#4caf50',
+    'Strong Match': '#8bc34a',
+    'Trending': '#d42b2b',
+    'Rising': '#b8860b',
+    'Low Competition': '#6a6',
+    'Moderate Competition': '#888',
+    'Platform Favorite': '#4caf50',
+    'Platform Friendly': '#8bc34a',
+    'Blue Ocean': '#d42b2b',
+    'Hidden Gem': '#8bc34a',
+    'Professional Term': '#4caf50',
+    'Creator Friendly': '#b8860b',
+    'Emerging': '#4caf50',
+  }
+  return colors[label] || '#555'
+}
+
+export function copyToClipboard(text) {
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).catch(() => {})
+  }
+}
