@@ -44,6 +44,8 @@ PLATFORM_PROFILES: dict[str, dict] = {
             (r"(community|discover|explore|engagement|creator)", 22),
             (r"(photography|outfit|makeup|hair|nails|wellness)", 20),
             (r"(ootd|grwm|motd|shelfie|flatlay|inspo)", 28),
+            (r"(opening|haul|unboxing|collection|display|shelfie)", 18),
+            (r"(review|demo|tutorial|howto|guide)", 16),
         ],
         "category_boosts": {
             "Hashtag": 20, "Audience": 15, "Topic": 10,
@@ -59,6 +61,8 @@ PLATFORM_PROFILES: dict[str, dict] = {
             (r"(certification|compliance|governance|roi|scalability|infrastructure)", 22),
             (r"(workforce|talent|recruitment|hiring|management|executive)", 20),
             (r"(transformation|digitalization|optimization|automation)", 25),
+            (r"(market|trends|analysis|investing|valuation|economy)", 18),
+            (r"(collectible|investment|collector|limited|edition)", 16),
         ],
         "category_boosts": {
             "Industry Term": 20, "Brand": 12, "Topic": 10,
@@ -74,6 +78,8 @@ PLATFORM_PROFILES: dict[str, dict] = {
             (r"(trending|viral|discover|explore|pov|fyp|foryou)", 22),
             (r"(makeup|recipe|diy|transformation|dayinmylife|relatable)", 20),
             (r"(grwm|getready|nightroutine|morningroutine)", 25),
+            (r"(opening|haul|unboxing|collection|reveal)", 18),
+            (r"(review|demo|tutorial|howto|guide)", 16),
         ],
         "category_boosts": {
             "Hashtag": 20, "Topic": 12, "Audience": 10,
@@ -112,14 +118,15 @@ PLATFORM_PROFILES: dict[str, dict] = {
 }
 
 # ---------------------------------------------------------------------------
-# weights  —  platform is now the strongest signal
+# weights  —  product context is now the strongest signal
 # ---------------------------------------------------------------------------
 
-W_REL = 0.28
-W_TREND = 0.10
-W_LOW_COMP = 0.20
-W_PLATFORM = 0.37
-W_CONF = 0.05
+W_PRODUCT = 0.25
+W_REL = 0.12
+W_TREND = 0.08
+W_LOW_COMP = 0.18
+W_PLATFORM = 0.30
+W_CONF = 0.07
 
 # ---------------------------------------------------------------------------
 # helpers
@@ -155,7 +162,26 @@ def batch_semantic_relevance(tags: list[str], topic: str, product: str) -> list[
 
 
 # ---------------------------------------------------------------------------
-# 2  platform fit  (strongest signal)
+# 1b  product relevance  —  match tag against product alone
+# ---------------------------------------------------------------------------
+
+def compute_product_relevance(tag: str, product: str) -> float:
+    model = _get_sim()
+    emb_tag = model.encode([tag], normalize_embeddings=True)
+    emb_prod = model.encode([product], normalize_embeddings=True)
+    return round(max(0.0, min(100.0, float(np.dot(emb_tag, emb_prod.T)[0][0]) * 100.0)), 1)
+
+
+def batch_product_relevance(tags: list[str], product: str) -> list[float]:
+    model = _get_sim()
+    emb_tags = model.encode(tags, normalize_embeddings=True)
+    emb_prod = model.encode([product], normalize_embeddings=True)
+    sims = np.dot(emb_tags, emb_prod.T).flatten()
+    return [round(max(0.0, min(100.0, s * 100.0)), 1) for s in sims]
+
+
+# ---------------------------------------------------------------------------
+# 2  platform fit
 # ---------------------------------------------------------------------------
 
 EXPECTED_CATEGORIES = {"Product", "Hashtag", "Industry Term", "Audience", "Topic", "Brand", "Keyword"}
@@ -257,7 +283,8 @@ def _is_global_brand(tag: str) -> bool:
 # ---------------------------------------------------------------------------
 
 def _normalize_tag(tag: str) -> str:
-    t = re.sub(r"\s+", "", tag).lower()
+    t = tag.strip().lstrip("#").lower()
+    t = re.sub(r"\s+", "", t)
     t = re.sub(r"[^a-z0-9]", "", t)
     if t.endswith("s") and len(t) > 4:
         t = t[:-1]
@@ -347,10 +374,17 @@ def apply_diversity(candidates: list[dict], lambda_: float = 0.45, top_k: int = 
 def _quality_labels(c: dict, platform: str) -> list[str]:
     labels = []
     rel = c["semantic_relevance"]
+    prod_rel = c.get("product_relevance", 0)
     tr = c["trend_score"]
     comp = c["competition_score"]
     fit = c["platform_fit"]
     tag = c.get("tag", "")
+    bonus = c.get("product_bonus", 0)
+
+    if prod_rel >= 70 and bonus > 0:
+        labels.append("Product Match")
+    elif prod_rel >= 55:
+        labels.append("Product Related")
 
     if rel >= 80:
         labels.append("Excellent Match")
@@ -389,14 +423,12 @@ def _quality_labels(c: dict, platform: str) -> list[str]:
     elif c.get("category") == "Hashtag" and platform in ("Instagram", "TikTok"):
         labels.append("Creator Friendly")
 
-    # Long tail: high relevance + low competition + moderate/rising trend
     if rel > 50 and comp < 35 and 30 <= tr <= 65:
         labels.append("Long Tail")
 
     if rel > 55 and comp < 40 and tr < 30:
         labels.append("Evergreen")
 
-    # Remove contradictions:
     if "Low Competition" in labels and "Moderate Competition" in labels:
         labels.remove("Moderate Competition")
     if "Blue Ocean" in labels and "Hidden Gem" in labels:
@@ -566,8 +598,11 @@ def rank_candidates(
     types = [c.get("type", "hashtag" if len(t.split()) <= 2 else "keyword") for c, t in zip(candidates, tags)]
     categories = [c.get("category", "Keyword") for c in candidates]
 
-    # 1  batch semantic relevance
+    # 1  batch semantic relevance (topic + product combined)
     rel_scores = batch_semantic_relevance(tags, topic, product)
+
+    # 1b  product relevance (product alone — higher if tag matches specific product)
+    prod_rel_scores = batch_product_relevance(tags, product)
 
     # 2  trend + competition
     trend_scores: list[float] = []
@@ -583,10 +618,18 @@ def rank_candidates(
 
     profile_conf = compute_profile_confidence(niche_id, user_id)
 
+    # Extract product vocab for confidence bonus
+    from backend.product_vocab import extract_product_vocab
+    pv = extract_product_vocab(product, topic)
+    product_terms = pv.get("all_terms", set())
+    if not isinstance(product_terms, set):
+        product_terms = set(product_terms)
+
     # 5  assemble enriched candidates with score breakdown
     enriched: list[dict] = []
     for i in range(len(tags)):
         rel = rel_scores[i]
+        prod_rel = prod_rel_scores[i]
         tr = trend_scores[i]
         comp = comp_scores[i]
         fit = fit_scores[i]
@@ -594,21 +637,38 @@ def rank_candidates(
         cat = categories[i] if categories[i] in EXPECTED_CATEGORIES else "Keyword"
         opp = round(rel * tr * (100 - comp) / 10000.0, 1)
 
+        # Product confidence bonus: only when tag strongly matches the product
+        product_bonus = 0
+        tag_lower = tags[i].lower()
+        tag_words = set(tag_lower.split())
+        if prod_rel >= 65:
+            product_bonus = 8
+        elif prod_rel >= 50:
+            product_bonus = 5
+        elif (product_terms & tag_words) and prod_rel >= 35:
+            product_bonus = 4
+        elif any(a in tag_lower for a in pv.get("aliases", [])) and prod_rel >= 40:
+            product_bonus = 3
+
+        prod_contrib = round(prod_rel * W_PRODUCT, 1)
         sem_contrib = round(rel * W_REL, 1)
         trend_contrib = round(tr * W_TREND, 1)
         comp_contrib = round(low_comp * W_LOW_COMP, 1)
         plat_contrib = round(fit * W_PLATFORM, 1)
         conf_contrib = round(profile_conf * W_CONF, 1)
 
-        final = round(sem_contrib + trend_contrib + comp_contrib + plat_contrib + conf_contrib, 1)
+        final = round(prod_contrib + sem_contrib + trend_contrib + comp_contrib + plat_contrib + conf_contrib + product_bonus, 1)
 
         score_breakdown = {
+            "product_contribution": prod_contrib,
             "semantic_contribution": sem_contrib,
             "trend_contribution": trend_contrib,
             "competition_contribution": comp_contrib,
             "platform_contribution": plat_contrib,
             "confidence_contribution": conf_contrib,
+            "product_bonus": product_bonus,
             "weights": {
+                "product": W_PRODUCT,
                 "semantic": W_REL,
                 "trend": W_TREND,
                 "low_competition": W_LOW_COMP,
@@ -622,9 +682,11 @@ def rank_candidates(
             "type": types[i],
             "category": cat,
             "semantic_relevance": rel,
+            "product_relevance": prod_rel,
             "trend_score": tr,
             "competition_score": comp,
             "platform_fit": fit,
+            "product_bonus": product_bonus,
             "history_confidence": profile_conf,
             "final_score": final,
             "opportunity_score": opp,
@@ -665,15 +727,27 @@ def rank_candidates(
         tag_type = c["type"]
         tag_name = c["tag"]
 
+        # Product-aware enhancements
+        tag_words_set = set(tag_name.lower().split())
+        is_product_specific = bool(product_terms & tag_words_set) or any(a in tag_name.lower() for a in pv.get("aliases", []))
+        prod_rel = c.get("product_relevance", 0)
+
         # Blue ocean: niche opportunities with first-mover potential
         is_global = _is_global_brand(tag_name)
         is_long_tail = len(tag_name.split()) >= 3
         is_tech_term = cat == "Industry Term" and any(w in tag_name.lower() for w in ["tech", "ai", "ml", "data", "cloud", "api", "saas", "system", "platform", "solution", "software", "digital", "automation", "analytics"])
-        is_audience_focused = cat == "Audience" or any(w in tag_name.lower() for w in ["for", "professional", "developer", "creator", "founder", "designer", "engineer"])
 
-        # Blue ocean: high opp, low comp, not global brands
-        is_bo = (opp > 10.0 and comp < 45 and tr > 40 and not is_global) or (is_long_tail and opp > 8.0 and comp < 40) or (is_tech_term and opp > 8.0 and comp < 45)
-        is_hg = rel > 55 and comp < 35 and tr < 50 and not is_bo and not is_global
+        # Blue ocean: product-specific terms with low comp get priority; generic niche words need higher opp
+        if is_product_specific:
+            is_bo = opp > 6.0 and comp < 50
+        elif is_long_tail and opp > 8.0 and comp < 40:
+            is_bo = True
+        elif is_tech_term and opp > 8.0 and comp < 45:
+            is_bo = True
+        else:
+            is_bo = opp > 12.0 and comp < 40 and tr > 40 and not is_global
+
+        is_hg = rel > 55 and comp < 35 and tr < 50 and not is_bo and not is_global and (is_product_specific or is_long_tail)
         is_hc = comp > 75
 
         c["is_blue_ocean"] = is_bo

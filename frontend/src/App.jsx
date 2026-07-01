@@ -16,6 +16,7 @@ import ExportReport from './components/ExportReport'
 import EmptyState from './components/EmptyState'
 import SavedSetsPanel from './components/SavedSetsPanel'
 import DashboardPage from './components/DashboardPage'
+import NicheDropdown from './components/NicheDropdown'
 import { api, isGuest } from './api'
 
 function slugify(text) {
@@ -176,25 +177,15 @@ export default function App({ onLogout }) {
             </div>
             <div className="flex items-center gap-2 ml-6 pl-6 border-l" style={{ borderColor: 'var(--border)' }}>
               <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>NICHE</span>
-              <select
-                value={activeNiche}
-                onChange={e => handleNicheSwitch(e.target.value)}
-                className="text-xs px-2 py-1 border appearance-none focus:outline-none"
-                style={{
-                  backgroundColor: 'transparent',
-                  borderColor: 'var(--border-light)',
-                  color: 'var(--text)',
-                  borderRadius: '0',
-                }}
-              >
-                {niches.map(n => (
-                  <option key={n.niche_id} value={n.niche_id}>{n.display_name}</option>
-                ))}
-              </select>
+              <NicheDropdown
+                niches={niches}
+                activeNiche={activeNiche}
+                onSwitch={handleNicheSwitch}
+              />
               <button
                 onClick={() => setShowNichePanel(!showNichePanel)}
                 className="text-xs px-2 py-1"
-                style={{ backgroundColor: 'transparent', border: '1px solid #333', color: 'var(--text-secondary)', cursor: 'pointer' }}
+                style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', cursor: 'pointer' }}
               >
                 + CUSTOM
               </button>
@@ -210,7 +201,7 @@ export default function App({ onLogout }) {
                 <button
                   onClick={handleSaveCurrentSet}
                   className="text-xs px-2 py-1"
-                  style={{ backgroundColor: 'transparent', border: '1px solid #333', color: 'var(--text-secondary)', cursor: 'pointer' }}
+                  style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', cursor: 'pointer' }}
                 >
                   + SAVE
                 </button>
@@ -517,7 +508,7 @@ function VocabularyViewer({ profile }) {
               <div className="text-xs" style={{ color: 'var(--text-secondary)', maxHeight: '120px', overflowY: 'auto' }}>
                 {terms.length > 0
                   ? terms.map((t, i) => (
-                      <span key={i} className="inline-block mr-1 mb-0.5 px-1.5 py-0.5" style={{ backgroundColor: 'var(--surface-2)', color: '#ccc' }}>{t}</span>
+                      <span key={i} className="inline-block mr-1 mb-0.5 px-1.5 py-0.5" style={{ backgroundColor: 'var(--surface-2)', color: 'var(--text-secondary)' }}>{t}</span>
                     ))
                   : <span style={{ color: 'var(--text-muted)' }}>—</span>
                 }
@@ -532,7 +523,7 @@ function VocabularyViewer({ profile }) {
           <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>
             {Object.entries(profile.synonyms).map(([key, vals]) => (
               <div key={key} className="mb-0.5">
-                <span style={{ color: '#ccc' }}>{key}</span>
+                <span style={{ color: 'var(--text-tertiary)' }}>{key}</span>
                 <span style={{ color: 'var(--text-tertiary)' }}> → {vals.join(', ')}</span>
               </div>
             ))}
