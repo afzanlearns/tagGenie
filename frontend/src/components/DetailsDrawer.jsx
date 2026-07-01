@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import MetricBar from './MetricBar'
 import { getRecommendationLabel, getRecommendationType, formatScoreOne, safeNumber, confidenceBand, competitionLevel, qualityLabelColor, copyToClipboard } from '../recommendation'
 
@@ -22,6 +23,8 @@ function ContributionBar({ label, value, color, max }) {
 }
 
 export default function DetailsDrawer({ tag, onClose }) {
+  const [copied, setCopied] = useState(false)
+
   if (!tag) return null
 
   const label = getRecommendationLabel(tag)
@@ -67,12 +70,12 @@ export default function DetailsDrawer({ tag, onClose }) {
         <span className="text-xs font-medium" style={{ color: '#555' }}>RECOMMENDATION DETAILS</span>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => copyToClipboard(label)}
+            onClick={() => { copyToClipboard(label); setCopied(true); setTimeout(() => setCopied(false), 1500) }}
             className="text-xs px-2 py-1"
             style={{ backgroundColor: 'transparent', border: '1px solid #333', color: '#888', cursor: 'pointer' }}
             title="Copy tag name"
           >
-            📋
+            {copied ? '✓' : '📋'}
           </button>
           <button
             onClick={onClose}

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { api } from '../api'
 import { getRecommendationLabel, formatScore, safeNumber } from '../recommendation'
 
-const ALL_PLATFORMS = ['LinkedIn', 'Instagram', 'X', 'TikTok']
+const ALL_PLATFORMS = ['LinkedIn', 'Instagram', 'X', 'TikTok', 'Pinterest']
 
 export default function PlatformComparison({ topic, product, niche, onSelectTag }) {
   const [results, setResults] = useState({})

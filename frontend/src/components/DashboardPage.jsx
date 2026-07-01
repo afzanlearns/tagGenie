@@ -24,24 +24,32 @@ export default function DashboardPage({ currentUser }) {
   }
 
   const summaryCards = [
-    { label: 'TOTAL NICHES', value: stats.total_niches },
-    { label: 'RECOMMENDATIONS', value: stats.recommendations_generated },
-    { label: 'SESSIONS', value: stats.total_sessions },
-    { label: 'BLUE OCEAN FOUND', value: stats.blue_ocean_opportunities_found },
-    { label: 'AVG CONFIDENCE', value: `${stats.average_confidence}%` },
-    { label: 'MOST USED PLATFORM', value: stats.most_used_platform },
-    { label: 'MOST USED NICHE', value: stats.most_used_niche },
+    { label: 'TOTAL NICHES', value: stats.total_niches, color: '#555' },
+    { label: 'RECOMMENDATIONS', value: stats.recommendations_generated, color: '#555' },
+    { label: 'SESSIONS', value: stats.total_sessions, color: '#555' },
+    { label: 'BLUE OCEAN FOUND', value: stats.blue_ocean_opportunities_found, color: 'var(--accent)' },
+    { label: 'AVG CONFIDENCE', value: `${stats.average_confidence}%`, color: '#4caf50' },
+    { label: 'MOST USED PLATFORM', value: stats.most_used_platform || '—', color: '#8bc34a' },
+    { label: 'MOST USED NICHE', value: stats.most_used_niche || '—', color: '#b8860b' },
+    { label: 'AVG BLUE OCEAN SCORE', value: stats.average_blue_ocean_score != null ? stats.average_blue_ocean_score.toFixed(1) : '—', color: '#d42b2b' },
+    { label: 'MOST COMMON CATEGORY', value: stats.most_common_category || '—', color: '#888' },
+    { label: 'TOP SAVED NICHE', value: stats.top_saved_niche || '—', color: '#666' },
   ]
 
   return (
     <div>
       <div className="text-xs font-medium mb-4" style={{ color: '#555' }}>USER DASHBOARD</div>
+      <div className="text-xs mb-4" style={{ color: '#444' }}>
+        {stats.recommendations_generated > 0
+          ? `${stats.recommendations_generated} recommendations across ${stats.total_niches || 0} niches`
+          : 'Start generating recommendations to populate your dashboard.'}
+      </div>
 
-      <div className="grid grid-cols-3 md:grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
         {summaryCards.map(c => (
-          <div key={c.label} className="border p-4" style={{ borderColor: '#1C1C1C' }}>
-            <div className="text-xs mb-1" style={{ color: '#555' }}>{c.label}</div>
-            <div className="text-lg font-bold" style={{ color: 'var(--text)' }}>{c.value}</div>
+          <div key={c.label} className="border p-3" style={{ borderColor: '#1C1C1C', backgroundColor: '#0D0D0D' }}>
+            <div className="text-xs mb-1 truncate" style={{ color: '#555' }}>{c.label}</div>
+            <div className="text-lg font-bold" style={{ color: c.color || 'var(--text)' }}>{c.value}</div>
           </div>
         ))}
       </div>
@@ -50,9 +58,9 @@ export default function DashboardPage({ currentUser }) {
         <div>
           <div className="text-xs font-medium mb-3" style={{ color: '#555' }}>RECENT ACTIVITY</div>
           <div className="space-y-1">
-            {stats.history_timeline.map((h, i) => (
+            {stats.history_timeline.slice(0, 10).map((h, i) => (
               <div key={i} className="flex items-center justify-between px-4 py-2 text-xs" style={{ borderBottom: '1px solid #141414' }}>
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <span className="truncate" style={{ color: 'var(--text)' }}>{h.topic}</span>
                   <span className="ml-2" style={{ color: '#555' }}>· {h.platform}</span>
                 </div>

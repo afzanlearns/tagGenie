@@ -28,7 +28,7 @@ function slugify(text) {
   return s || 'untitled'
 }
 
-const PLATFORMS = ['LinkedIn', 'Instagram', 'X', 'TikTok']
+const PLATFORMS = ['LinkedIn', 'Instagram', 'X', 'TikTok', 'Pinterest']
 
 export default function App({ onLogout }) {
   const [topic, setTopic] = useState('')

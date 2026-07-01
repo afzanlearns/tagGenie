@@ -39,10 +39,12 @@ export function safeNumber(v, fallback = 0) {
 }
 
 export function confidenceBand(score) {
-  if (score >= 90) return { label: 'Excellent', color: '#4caf50' }
-  if (score >= 80) return { label: 'Very Strong', color: '#8bc34a' }
-  if (score >= 70) return { label: 'Strong', color: '#d42b2b' }
-  if (score >= 60) return { label: 'Moderate', color: '#b8860b' }
+  if (score >= 90) return { label: 'Elite', color: '#4caf50' }
+  if (score >= 80) return { label: 'Excellent', color: '#8bc34a' }
+  if (score >= 70) return { label: 'Very Strong', color: '#d42b2b' }
+  if (score >= 60) return { label: 'Strong', color: '#b8860b' }
+  if (score >= 50) return { label: 'Moderate', color: '#888' }
+  if (score >= 40) return { label: 'Fair', color: '#666' }
   return { label: 'Weak', color: '#555' }
 }
 
@@ -68,6 +70,11 @@ export function qualityLabelColor(label) {
     'Professional Term': '#4caf50',
     'Creator Friendly': '#b8860b',
     'Emerging': '#4caf50',
+    'Long Tail': '#b8860b',
+    'Brand Label': '#888',
+    'Evergreen': '#4caf50',
+    'Technical': '#8bc34a',
+    'Educational': '#4caf50',
   }
   return colors[label] || '#555'
 }
