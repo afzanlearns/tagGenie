@@ -28,14 +28,34 @@ def extract_candidates(topic: str, product: str, niche_id: str = None,
     profile = get_niche_profile(niche_id, user_id)
 
     all_vocab = []
+    term_to_category: dict[str, str] = {}
     if profile:
-        for cat in ["industry_terms", "products", "topics", "hashtags", "brands", "audience"]:
-            all_vocab.extend(profile.get(cat, []))
+        category_map = {
+            "industry_terms": "Industry Term",
+            "products": "Product",
+            "topics": "Topic",
+            "hashtags": "Hashtag",
+            "brands": "Brand",
+            "audience": "Audience",
+        }
+        for cat_key, display_cat in category_map.items():
+            terms = profile.get(cat_key, [])
+            for t in terms:
+                t_lower = t.strip().lower()
+                all_vocab.append(t_lower)
+                term_to_category[t_lower] = display_cat
 
         synonyms = profile.get("synonyms", {})
         for key, syn_list in synonyms.items():
-            all_vocab.append(key)
-            all_vocab.extend(syn_list)
+            k = key.strip().lower()
+            all_vocab.append(k)
+            if k not in term_to_category:
+                term_to_category[k] = "Topic"
+            for syn in syn_list:
+                s = syn.strip().lower()
+                all_vocab.append(s)
+                if s not in term_to_category:
+                    term_to_category[s] = "Topic"
 
         all_vocab = list(dict.fromkeys(all_vocab))
 
@@ -46,26 +66,27 @@ def extract_candidates(topic: str, product: str, niche_id: str = None,
         emb_vocab = model.encode(all_vocab)
         emb_query = model.encode([combined_query])
         scores = np.dot(emb_vocab, emb_query.T).flatten()
-        top_indices = np.argsort(scores)[::-1][:40]
-        threshold = 0.25
+        top_indices = np.argsort(scores)[::-1][:50]
+        threshold = 0.20
         scored_terms = []
         for idx in top_indices:
             if scores[idx] >= threshold:
                 term = all_vocab[idx].strip().lower()
                 conf = round(float(scores[idx] * 100.0), 1)
-                if is_valid_candidate(term, topic, product, min_confidence=30.0):
+                if is_valid_candidate(term, topic, product, min_confidence=25.0):
                     tag_type = "hashtag" if len(term.split()) <= 2 else "keyword"
-                    scored_terms.append({"tag": term, "type": tag_type, "confidence": conf})
+                    category = term_to_category.get(term, "Keyword")
+                    scored_terms.append({"tag": term, "type": tag_type, "category": category, "confidence": conf})
 
         if scored_terms:
             scored_terms.sort(key=lambda x: x["confidence"], reverse=True)
-            return scored_terms[:25]
+            return scored_terms[:40]
 
     fallback_terms = _generate_fallback_terms(topic, product)
     filtered = filter_candidates(fallback_terms, topic, product, min_confidence=25.0)
     return [
-        {"tag": t, "type": "hashtag" if len(t.split()) <= 2 else "keyword", "confidence": 50.0}
-        for t in filtered[:15]
+        {"tag": t, "type": "hashtag" if len(t.split()) <= 2 else "keyword", "category": "Keyword", "confidence": 50.0}
+        for t in filtered[:20]
     ]
 
 

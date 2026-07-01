@@ -41,15 +41,15 @@ def load_weights(user_id: str = None) -> dict:
     if path.exists():
         with open(path) as f:
             saved = json.load(f)
-        for platform, weights in saved.items():
+        for platform, w in saved.items():
             if platform in PLATFORM_WEIGHTS:
-                PLATFORM_WEIGHTS[platform].update(weights)
+                PLATFORM_WEIGHTS[platform].update(w)
     elif WEIGHTS_FILE.exists() and (user_id is None or user_id.startswith("guest_")):
         with open(WEIGHTS_FILE) as f:
             saved = json.load(f)
-        for platform, weights in saved.items():
+        for platform, w in saved.items():
             if platform in PLATFORM_WEIGHTS:
-                PLATFORM_WEIGHTS[platform].update(weights)
+                PLATFORM_WEIGHTS[platform].update(w)
     return PLATFORM_WEIGHTS
 
 
@@ -96,19 +96,12 @@ def score_topic(
             fallback_mode=False,
         )
 
-    ranked = ranking.rank_candidates(
+    ranked_tags, gap_tags, high_comp_tags, hidden_gems, rejected, mix_summary, analytics = ranking.rank_candidates(
         raw_candidates, topic, product, platform, niche_id, user_id,
     )
 
     top_confidence = ranking.compute_profile_confidence(niche_id, user_id)
     fallback_mode = top_confidence < 50.0
-
-    gaps = ranking.find_gaps(ranked)
-    gap_tags = [
-        GapTag(**g) for g in gaps
-    ]
-
-    ranked_tags = ranked[:10]
 
     return ScoreResponse(
         topic=topic,
@@ -116,23 +109,26 @@ def score_topic(
         niche=niche_id,
         ranked_tags=ranked_tags,
         gap_tags=gap_tags,
+        high_competition_tags=high_comp_tags,
+        hidden_gems=hidden_gems,
+        rejected_candidates=rejected,
+        mix_summary=mix_summary,
+        analytics=analytics,
         confidence=top_confidence,
         fallback_mode=fallback_mode,
     )
 
 
 def semantic_relevance(tag: str, topic: str, product: str = "") -> float:
-    """Backward-compatible wrapper: product is optional."""
     return ranking.compute_semantic_relevance(tag, topic, product)
 
 
 def _get_sim_model():
-    """Backward-compatible alias — pre-loads embedding model on startup."""
     from backend.ranking import _get_sim
     return _get_sim()
 
-# backward-compatible aliases for existing tests
-from backend.ranking import (  # noqa: F401
+
+from backend.ranking import (
     compute_trend_score,
     compute_low_competition,
     compute_platform_fit,

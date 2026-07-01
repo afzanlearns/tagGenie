@@ -1,55 +1,66 @@
 """Recommendation ranking engine.
 
-Replaces the old composite-score approach with a structured multi-signal
-ranking that produces meaningful score spread, platform-aware ordering,
-duplicate deduplication, semantic diversity, and post-rank explanations.
+Multi-signal ranking with platform-aware ordering, duplicate deduplication,
+semantic diversity, category assignment, blue-ocean / high-competition /
+hidden-gem detection, rejected candidate tracking, and rich explanations.
 """
 
 import re
+
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
-from backend import embeddings
-from backend import trends
+from backend import embeddings, trends
 from backend.niche_manager import get_niche_profile, get_active_niche
-from backend.models import CandidateTag
+from backend.models import (
+    CandidateTag,
+    GapTag,
+    HighCompetitionTag,
+    HiddenGemTag,
+    RejectedCandidateTag,
+    MixSummary,
+    ScoreAnalytics,
+    confidence_band,
+)
 
 # ---------------------------------------------------------------------------
-# platform profiles  —  how each platform weights tag types & term patterns
+# platform profiles
 # ---------------------------------------------------------------------------
 
-PlatformProfile = dict
-
-PLATFORM_PROFILES: dict[str, PlatformProfile] = {
+PLATFORM_PROFILES: dict[str, dict] = {
     "Instagram": {
         "base_hashtag": 1.0,
-        "base_keyword": 0.3,
+        "base_keyword": 0.25,
         "boost_patterns": [
-            (r"(life|vibes|culture|lover|tok|daily|style|gram)$", 15),
-            (r"^(coffee|fit|food|travel|fashion)", 10),
+            (r"(life|vibes|culture|lover|tok|daily|style|gram)$", 20),
+            (r"^(coffee|fit|food|travel|fashion|beauty)", 15),
+            (r"(community|discover|explore|trending)", 12),
         ],
     },
     "LinkedIn": {
-        "base_hashtag": 0.3,
+        "base_hashtag": 0.25,
         "base_keyword": 1.0,
         "boost_patterns": [
-            (r"(industry|strategy|supply.?chain|leadership|innovation|professional|sector|market|trend)", 15),
-            (r"^(thought|expert|insight|analysis|enterprise)", 10),
+            (r"(industry|strategy|supply.?chain|leadership|innovation|professional|sector|market|trend|b2b)", 20),
+            (r"^(thought|expert|insight|analysis|enterprise|enterprise)", 15),
+            (r"(certification|compliance|governance|framework)", 12),
         ],
     },
     "TikTok": {
         "base_hashtag": 1.0,
-        "base_keyword": 0.4,
+        "base_keyword": 0.35,
         "boost_patterns": [
-            (r"(tok|hack|challenge|tutorial|routine|aesthetic|viral)$", 15),
-            (r"^(coffeetok|beautytok|fittok|gaming)", 10),
+            (r"(tok|hack|challenge|tutorial|routine|aesthetic|viral)$", 20),
+            (r"^(coffeetok|beautytok|fittok|gaming|foodtok)", 15),
+            (r"(trending|viral|discover|explore)", 12),
         ],
     },
     "X": {
-        "base_hashtag": 0.7,
+        "base_hashtag": 0.6,
         "base_keyword": 0.7,
         "boost_patterns": [
-            (r"(news|breaking|update|trending|hot)$", 10),
+            (r"(news|breaking|update|trending|hot|just.?in)$", 15),
+            (r"^(report|analysis|opinion|watch)", 10),
         ],
     },
 }
@@ -69,12 +80,11 @@ def _get_sim():
 
 
 def _normalize_tag(tag: str) -> str:
-    """Normalise a tag for deduplication (strip spaces, lowercase)."""
     return re.sub(r"\s+", "", tag).lower()
 
 
 # ---------------------------------------------------------------------------
-# 1  semantic relevance  (40% weight)
+# 1  semantic relevance
 # ---------------------------------------------------------------------------
 
 def compute_semantic_relevance(tag: str, topic: str, product: str) -> float:
@@ -96,21 +106,43 @@ def batch_semantic_relevance(tags: list[str], topic: str, product: str) -> list[
 
 
 # ---------------------------------------------------------------------------
-# 2  platform fit  (15% weight)
+# 2  platform fit  (higher weight, more aggressive)
 # ---------------------------------------------------------------------------
 
-def compute_platform_fit(tag: str, tag_type: str, platform: str) -> float:
+def compute_platform_fit(tag: str, tag_type: str, platform: str, category: str = "") -> float:
     profile = PLATFORM_PROFILES.get(platform, PLATFORM_PROFILES["X"])
     base = profile["base_hashtag"] if tag_type == "hashtag" else profile["base_keyword"]
+
+    category_boost = 0.0
+    if platform == "LinkedIn":
+        if category in ("Industry Term", "Brand", "Topic"):
+            category_boost = 10
+        elif category == "Hashtag":
+            category_boost = -10
+    elif platform == "Instagram":
+        if category in ("Hashtag", "Audience", "Topic"):
+            category_boost = 10
+        elif category == "Industry Term":
+            category_boost = -10
+    elif platform == "TikTok":
+        if category in ("Hashtag", "Topic"):
+            category_boost = 10
+        elif category == "Industry Term":
+            category_boost = -10
+    elif platform == "X":
+        if category in ("Topic", "Brand"):
+            category_boost = 8
+
     boost = 0.0
     for pattern, pts in profile.get("boost_patterns", []):
         if re.search(pattern, tag, re.IGNORECASE):
             boost = max(boost, pts)
-    return round(max(0.0, min(100.0, (base * 70.0) + boost)), 1)
+
+    return round(max(0.0, min(100.0, (base * 60.0) + boost + category_boost)), 1)
 
 
 # ---------------------------------------------------------------------------
-# 3  competition  (15% weight — inverse)
+# 3  competition
 # ---------------------------------------------------------------------------
 
 def compute_low_competition(comp_score: float) -> float:
@@ -118,7 +150,7 @@ def compute_low_competition(comp_score: float) -> float:
 
 
 # ---------------------------------------------------------------------------
-# 4  trend / reach  (25% weight)
+# 4  trend
 # ---------------------------------------------------------------------------
 
 def compute_trend_score(reach_volume: float) -> float:
@@ -126,7 +158,7 @@ def compute_trend_score(reach_volume: float) -> float:
 
 
 # ---------------------------------------------------------------------------
-# 5  confidence / profile quality  (5% weight)
+# 5  profile confidence
 # ---------------------------------------------------------------------------
 
 def compute_profile_confidence(niche_id: str, user_id: str | None = None) -> float:
@@ -153,16 +185,6 @@ def compute_profile_confidence(niche_id: str, user_id: str | None = None) -> flo
 # 6  duplicate normalisation
 # ---------------------------------------------------------------------------
 
-_DUPLICATE_GROUPS: list[tuple[re.Pattern, callable]] = []
-
-
-def _build_duplicate_groups():
-    if _DUPLICATE_GROUPS:
-        return
-    space_variants = re.compile(r"^(.+?)\s+(.+)$")
-    _DUPLICATE_GROUPS.append((space_variants, lambda m: f"{m.group(1)}{m.group(2)}"))
-
-
 def normalise_tag(term: str) -> str:
     return _normalize_tag(term)
 
@@ -181,10 +203,10 @@ def deduplicate(candidates: list[dict]) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
-# 7  diversity penalty  (Maximal Marginal Relevance)
+# 7  diversity penalty  (MMR)
 # ---------------------------------------------------------------------------
 
-def apply_diversity(candidates: list[dict], lambda_: float = 0.4, top_k: int = 10) -> list[dict]:
+def apply_diversity(candidates: list[dict], lambda_: float = 0.35, top_k: int = 15) -> list[dict]:
     if len(candidates) <= 1:
         return candidates
 
@@ -208,10 +230,10 @@ def apply_diversity(candidates: list[dict], lambda_: float = 0.4, top_k: int = 1
             sim_to_selected = float(np.max(np.dot(emb[i], selected_embs.T)))
             scores[i] = scores[i] - lambda_ * sim_to_selected * 100.0
 
-        best = int(np.argmax(scores))
-        if best in remaining:
-            selected.append(best)
-            remaining.remove(best)
+        best_idx = int(np.argmax(scores))
+        if best_idx in remaining:
+            selected.append(best_idx)
+            remaining.remove(best_idx)
         else:
             break
 
@@ -219,50 +241,87 @@ def apply_diversity(candidates: list[dict], lambda_: float = 0.4, top_k: int = 1
 
 
 # ---------------------------------------------------------------------------
-# 8  explanation generator
+# 8  explanation generator  (rich natural language)
 # ---------------------------------------------------------------------------
 
-def _metric_label(value: float, high_threshold: float = 70,
-                   low_threshold: float = 35) -> str:
-    if value >= high_threshold:
+def _metric_label(value: float, high: float = 70, low: float = 35) -> str:
+    if value >= high:
         return "strong"
-    if value >= low_threshold:
+    if value >= low:
         return "moderate"
     return "low"
 
 
-def generate_explanation(tag: str, semantic_relevance: float, trend_score: float,
-                         competition_score: float, platform_fit: float,
-                         rank: int, total: int) -> str:
-    rel_label = _metric_label(semantic_relevance)
-    trend_label = _metric_label(trend_score)
+_RELEVANCE_PREFIX = {
+    "strong": "Excellent semantic match to the query",
+    "moderate": "Good semantic relevance to the query",
+    "low": "Limited semantic connection to the query",
+}
+
+_TREND_PREFIX = {
+    "strong": "Strong momentum and growing interest",
+    "moderate": "Moderate trending signals detected",
+    "low": "Low trending activity currently",
+}
+
+_COMPETITION_PREFIX = {
+    "strong": "Very low competition — an underused term with first-mover potential",
+    "moderate": "Moderate competition levels",
+    "low": "High competition — very saturated space with many creators",
+}
+
+_PLATFORM_PREFIX = {
+    "strong": "Highly favored for this platform",
+    "moderate": "Adequate fit for this platform",
+    "low": "Suboptimal for this platform's content style",
+}
+
+
+def generate_explanation(
+    tag: str, semantic_relevance: float, trend_score: float,
+    competition_score: float, platform_fit: float,
+    rank: int, total: int,
+) -> str:
+    rel = _metric_label(semantic_relevance)
+    tr = _metric_label(trend_score)
     comp_label = _metric_label(100 - competition_score)
-    plat_label = _metric_label(platform_fit)
+    plat = _metric_label(platform_fit)
 
     parts = []
-    if rel_label != "low":
-        parts.append(f"{rel_label} semantic relevance ({semantic_relevance:.0f}/100)")
-    if trend_label != "low":
-        parts.append(f"{trend_label} trend momentum ({trend_score:.0f}/100)")
-    else:
-        parts.append(f"limited trend data ({trend_score:.0f}/100)")
-    if comp_label == "strong":
-        parts.append("low competition — an underused term")
-    elif comp_label == "low":
-        parts.append(f"high competition ({competition_score:.0f}/100)")
-    else:
-        parts.append(f"moderate competition ({competition_score:.0f}/100)")
-    if plat_label == "strong":
-        parts.append(f"excellent platform fit ({platform_fit:.0f}/100)")
-    elif plat_label == "moderate":
-        parts.append(f"moderate platform fit ({platform_fit:.0f}/100)")
+    parts.append(f"#{rank} {tag}.")
 
-    return f"#{rank} {tag}: {', '.join(parts)}."
+    parts.append(f"{_RELEVANCE_PREFIX[rel]} ({semantic_relevance:.0f}/100).")
+    parts.append(f"{_TREND_PREFIX[tr]} ({trend_score:.0f}/100).")
+    parts.append(f"{_COMPETITION_PREFIX[comp_label]} ({competition_score:.0f}/100).")
+    parts.append(f"{_PLATFORM_PREFIX[plat]} ({platform_fit:.0f}/100).")
+
+    if rank == 1:
+        parts.append("Top recommendation — highest overall score across all signals.")
+    elif rank <= 3:
+        parts.append("Top-three pick — strong across relevance, trend, and platform fit.")
+    elif rank <= 5:
+        parts.append("Strong contender — good balance of signals with room for growth.")
+
+    return " ".join(parts)
 
 
 # ---------------------------------------------------------------------------
-# 9  main ranking entry point
+# 9  category detection from profile
 # ---------------------------------------------------------------------------
+
+def _compute_opportunity_score(rel: float, trend: float, comp: float) -> float:
+    return round(rel * trend * (100 - comp) / 10000.0, 1)
+
+
+# ---------------------------------------------------------------------------
+# 10  main ranking entry point
+# ---------------------------------------------------------------------------
+
+TOP_K = 15
+DISPLAY_K = 10
+
+EXPECTED_CATEGORIES = {"Product", "Hashtag", "Industry Term", "Audience", "Topic", "Brand", "Keyword"}
+
 
 def rank_candidates(
     candidates: list[dict],
@@ -271,13 +330,15 @@ def rank_candidates(
     platform: str,
     niche_id: str,
     user_id: str | None = None,
-) -> list[CandidateTag]:
+) -> tuple[list[CandidateTag], list[GapTag], list[HighCompetitionTag], list[HiddenGemTag], list[RejectedCandidateTag], MixSummary, ScoreAnalytics]:
     """Rank candidates using the multi-signal scoring model.
 
-    Returns a list of CandidateTag objects ordered by final score descending.
+    Returns (ranked_tags, gap_tags, high_competition_tags, hidden_gems,
+             rejected_candidates, mix_summary, analytics).
     """
     tags = [c["tag"] for c in candidates]
     types = [c.get("type", "hashtag" if len(t.split()) <= 2 else "keyword") for c, t in zip(candidates, tags)]
+    categories = [c.get("category", "Keyword") for c in candidates]
 
     # 1  batch semantic relevance
     rel_scores = batch_semantic_relevance(tags, topic, product)
@@ -292,12 +353,17 @@ def rank_candidates(
         comp_scores.append(comp)
 
     # 3  platform fit
-    fit_scores = [compute_platform_fit(t, ty, platform) for t, ty in zip(tags, types)]
+    fit_scores = [compute_platform_fit(t, ty, platform, cat) for t, ty, cat in zip(tags, types, categories)]
 
-    # 4  profile confidence (same for all — computed once)
+    # Updated weights — more platform influence
+    W_REL = 0.35
+    W_TREND = 0.15
+    W_LOW_COMP = 0.15
+    W_PLATFORM = 0.30
+    W_CONF = 0.05
+
     profile_conf = compute_profile_confidence(niche_id, user_id)
 
-    # 5  assemble rows
     enriched: list[dict] = []
     for i in range(len(tags)):
         rel = rel_scores[i]
@@ -305,78 +371,211 @@ def rank_candidates(
         comp = comp_scores[i]
         fit = fit_scores[i]
         low_comp = compute_low_competition(comp)
+        opp = _compute_opportunity_score(rel, tr, comp)
+        cat = categories[i] if categories[i] in EXPECTED_CATEGORIES else "Keyword"
 
         final = round(
-            rel * 0.40
-            + tr * 0.25
-            + low_comp * 0.15
-            + fit * 0.15
-            + profile_conf * 0.05,
+            rel * W_REL
+            + tr * W_TREND
+            + low_comp * W_LOW_COMP
+            + fit * W_PLATFORM
+            + profile_conf * W_CONF,
             1,
         )
 
         enriched.append({
             "tag": tags[i],
             "type": types[i],
+            "category": cat,
             "semantic_relevance": rel,
             "trend_score": tr,
             "competition_score": comp,
             "platform_fit": fit,
             "history_confidence": profile_conf,
             "final_score": final,
+            "opportunity_score": opp,
         })
 
     # 6  deduplicate
     enriched = deduplicate(enriched)
 
-    # 7  initial rank by final score
+    # 7  initial rank
     enriched.sort(key=lambda x: x["final_score"], reverse=True)
 
     # 8  diversity penalty on top
-    enriched = apply_diversity(enriched, lambda_=0.4, top_k=10)
+    enriched = apply_diversity(enriched, lambda_=0.35, top_k=TOP_K)
 
-    # 9  generate explanations for top
+    total_evaluated = len(enriched)
+
+    # 9  classify each candidate
+    blue_ocean: list[CandidateTag] = []
+    high_comp: list[HighCompetitionTag] = []
+    hidden_gems: list[HiddenGemTag] = []
+    rejected: list[RejectedCandidateTag] = []
+
     result: list[CandidateTag] = []
-    for i, c in enumerate(enriched[:25]):
-        expl = generate_explanation(
-            c["tag"], c["semantic_relevance"], c["trend_score"],
-            c["competition_score"], c["platform_fit"], i + 1, len(enriched),
-        )
-        result.append(CandidateTag(
-            tag=c["tag"],
-            type=c["type"],
-            semantic_relevance=c["semantic_relevance"],
-            trend_score=c["trend_score"],
-            competition_score=c["competition_score"],
-            platform_fit=c["platform_fit"],
-            history_confidence=c["history_confidence"],
-            final_score=c["final_score"],
+    mix_counts: dict[str, int] = {"hashtags": 0, "products": 0, "industry_terms": 0, "audience": 0, "topics": 0, "brands": 0, "keywords": 0}
+
+    for i, c in enumerate(enriched):
+        rel = c["semantic_relevance"]
+        tr = c["trend_score"]
+        comp = c["competition_score"]
+        fit = c["platform_fit"]
+        opp = c["opportunity_score"]
+        final = c["final_score"]
+        cat = c["category"]
+        tag_type = c["type"]
+        tag_name = c["tag"]
+
+        is_bo = opp > 12.0 and comp < 45 and tr > 45
+        is_hg = rel > 55 and comp < 35 and tr < 50 and not is_bo
+        is_hc = comp > 75
+
+        band = confidence_band(final)
+
+        expl = generate_explanation(tag_name, rel, tr, comp, fit, i + 1, total_evaluated)
+
+        ct = CandidateTag(
+            tag=tag_name,
+            type=tag_type,
+            category=cat,
+            semantic_relevance=rel,
+            trend_score=tr,
+            competition_score=comp,
+            platform_fit=fit,
+            history_confidence=profile_conf,
+            final_score=final,
             explanation=expl,
-        ))
+            confidence_band=band,
+            opportunity_score=opp,
+            is_blue_ocean=is_bo,
+            is_hidden_gem=is_hg,
+            is_high_competition=is_hc,
+        )
 
-    return result
+        # Track mix
+        if tag_type == "hashtag":
+            mix_counts["hashtags"] += 1
+        elif cat == "Product":
+            mix_counts["products"] += 1
+        elif cat == "Industry Term":
+            mix_counts["industry_terms"] += 1
+        elif cat == "Audience":
+            mix_counts["audience"] += 1
+        elif cat == "Topic":
+            mix_counts["topics"] += 1
+        elif cat == "Brand":
+            mix_counts["brands"] += 1
+        else:
+            mix_counts["keywords"] += 1
+
+        result.append(ct)
+
+        if i >= TOP_K:
+            if is_hc:
+                high_comp.append(HighCompetitionTag(tag=tag_name, type=tag_type, competition_score=comp))
+            elif not is_bo and not is_hg and (comp > 60 or rel < 30):
+                rejected.append(RejectedCandidateTag(tag=tag_name, type=tag_type, reason=_rejection_reason(rel, tr, comp, fit)))
+
+    # Select top DISPLAY_K for ranked_tags
+    ranked_tags = result[:DISPLAY_K]
+
+    # Blue ocean: collect from top results + extra candidates
+    all_bo = [ct for ct in result if ct.is_blue_ocean]
+    all_bo.sort(key=lambda x: x.opportunity_score, reverse=True)
+    gap_tags = [
+        GapTag(
+            tag=bo.tag,
+            type=bo.type,
+            semantic_relevance=bo.semantic_relevance,
+            trend_score=bo.trend_score,
+            competition_score=bo.competition_score,
+            opportunity_score=bo.opportunity_score,
+            reason=(
+                f"High relevance ({bo.semantic_relevance:.0f}) + "
+                f"{'strong demand' if bo.trend_score > 60 else 'moderate demand'} "
+                f"({bo.trend_score:.0f}) + "
+                f"{'very low' if bo.competition_score < 25 else 'low'} saturation "
+                f"({bo.competition_score:.0f}) = blue ocean opportunity"
+            ),
+        )
+        for bo in all_bo[:5]
+    ]
+
+    # High competition tags: from all evaluated
+    high_competition_tags = []
+    seen_hc = set()
+    for ct in result:
+        if ct.is_high_competition and ct.tag not in seen_hc:
+            high_competition_tags.append(HighCompetitionTag(
+                tag=ct.tag, type=ct.type, competition_score=ct.competition_score,
+            ))
+            seen_hc.add(ct.tag)
+    high_competition_tags.sort(key=lambda x: x.competition_score, reverse=True)
+
+    # Hidden gems
+    all_hg = [ct for ct in result if ct.is_hidden_gem]
+    all_hg.sort(key=lambda x: x.semantic_relevance, reverse=True)
+    hidden_gem_list = [
+        HiddenGemTag(
+            tag=hg.tag, type=hg.type,
+            semantic_relevance=hg.semantic_relevance,
+            competition_score=hg.competition_score,
+            trend_score=hg.trend_score,
+            reason=(
+                f"High relevance ({hg.semantic_relevance:.0f}) + "
+                f"low competition ({hg.competition_score:.0f}) + "
+                f"moderate trend ({hg.trend_score:.0f}) — long-tail opportunity"
+            ),
+        )
+        for hg in all_hg[:5]
+    ]
+
+    # Rejected
+    rejection_list = rejected[:8]
+
+    # Mix summary
+    mix_summary = MixSummary(**mix_counts)
+
+    # Analytics
+    if ranked_tags:
+        avg_rel = sum(t.semantic_relevance for t in ranked_tags) / len(ranked_tags)
+        avg_tr = sum(t.trend_score for t in ranked_tags) / len(ranked_tags)
+        avg_comp = sum(t.competition_score for t in ranked_tags) / len(ranked_tags)
+        avg_plat = sum(t.platform_fit for t in ranked_tags) / len(ranked_tags)
+        avg_final = sum(t.final_score for t in ranked_tags) / len(ranked_tags)
+    else:
+        avg_rel = avg_tr = avg_comp = avg_plat = avg_final = 0.0
+
+    unique_cats = len(set(t.category for t in ranked_tags if t.category))
+
+    analytics = ScoreAnalytics(
+        avg_relevance=round(avg_rel, 1),
+        avg_trend=round(avg_tr, 1),
+        avg_competition=round(avg_comp, 1),
+        avg_platform_fit=round(avg_plat, 1),
+        avg_final_score=round(avg_final, 1),
+        diversity=round(len(ranked_tags) / max(total_evaluated, 1) * 100, 1) if total_evaluated else 0.0,
+        unique_categories=unique_cats,
+        blue_ocean_count=len(gap_tags),
+        high_competition_count=len(high_competition_tags),
+        hidden_gem_count=len(hidden_gem_list),
+        total_candidates_evaluated=total_evaluated,
+    )
+
+    return ranked_tags, gap_tags, high_competition_tags, hidden_gem_list, rejection_list, mix_summary, analytics
 
 
-# ---------------------------------------------------------------------------
-# 10  gap / blue ocean detection
-# ---------------------------------------------------------------------------
-
-def find_gaps(ranked: list[CandidateTag]) -> list[dict]:
-    """Detect blue-ocean opportunities from the ranked candidate list."""
-    gaps: list[dict] = []
-    for c in ranked:
-        opportunity = c.semantic_relevance * c.trend_score * (100 - c.competition_score) / 10000.0
-        if opportunity > 15.0 and c.competition_score < 40 and c.trend_score > 50:
-            gaps.append({
-                "tag": c.tag,
-                "type": c.type,
-                "semantic_relevance": c.semantic_relevance,
-                "trend_score": c.trend_score,
-                "competition_score": c.competition_score,
-                "reason": (
-                    f"High relevance ({c.semantic_relevance:.0f}) + strong demand "
-                    f"({c.trend_score:.0f}) + low saturation ({c.competition_score:.0f}) "
-                    f"= blue ocean opportunity"
-                ),
-            })
-    return gaps
+def _rejection_reason(rel: float, trend: float, comp: float, plat: float) -> str:
+    reasons = []
+    if comp > 75:
+        reasons.append("Very high competition")
+    if rel < 30:
+        reasons.append("Low semantic relevance")
+    if plat < 25:
+        reasons.append("Weak platform fit")
+    if trend < 20:
+        reasons.append("Insufficient trend data")
+    if not reasons:
+        reasons.append("Outranked by stronger candidates")
+    return ". ".join(reasons) + "."

@@ -9,6 +9,7 @@ from backend.models import (
     ScoreRequest, ScoreResponse, FeedbackRequest, IngestRequest,
     CreateNicheRequest, GenerateDraftRequest, SaveNicheDraftRequest,
     SignupRequest, LoginRequest, AuthResponse,
+    SaveHistoryRequest, SavedSetRequest, UserSettingsRequest,
 )
 from backend.niche_generator import generate_niche_draft
 from backend.niche_manager import save_niche_draft
@@ -30,6 +31,13 @@ from backend.auth import (
 )
 from backend.embeddings import _get_embedder
 from backend.candidate_filter import _get_nlp as _get_filter_nlp
+from backend.user_storage import (
+    save_history, get_history, get_history_detail, clear_history,
+    save_set, get_saved_sets, get_saved_set_detail, delete_saved_set,
+    save_settings, get_settings,
+    get_niche_metadata, update_niche_metadata,
+    get_dashboard_stats,
+)
 
 _ingested_topics = []
 
@@ -55,7 +63,7 @@ async def lifespan(app: FastAPI):
     shutdown_scheduler()
 
 
-app = FastAPI(title="TagGenie", version="3.0.0", lifespan=lifespan)
+app = FastAPI(title="TagGenie", version="3.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -74,7 +82,8 @@ def _get_user_id(current_user: dict) -> str:
     return str(current_user["user_id"])
 
 
-# ── Public endpoints (no auth required) ─────────────────────────────────────
+# ── Public endpoints ─────────────────────────────────────────────────────
+
 
 @app.post("/api/auth/signup")
 async def api_signup(req: SignupRequest):
@@ -156,7 +165,8 @@ async def api_health():
     return {"status": "ok"}
 
 
-# ── Protected endpoints (require JWT or guest token) ────────────────────────
+# ── Protected endpoints ──────────────────────────────────────────────────
+
 
 @app.get("/api/auth/me")
 async def api_me(current_user: dict = Depends(require_user)):
@@ -220,6 +230,13 @@ async def api_score(
 
     if req.include_baseline:
         cache_set(cache_key(f"{niche_id}:{req.topic}", req.platform), result)
+
+    # Save history for authenticated (non-guest) users
+    if not current_user.get("is_guest"):
+        save_history(
+            uid, req.topic, req.product, req.platform, niche_id, result.model_dump()
+        )
+        update_niche_metadata(uid, niche_id, result.confidence)
 
     return result
 
@@ -319,6 +336,14 @@ async def api_save_draft(req: SaveNicheDraftRequest, current_user: dict = Depend
     return {"status": "created", "niche": config}
 
 
+@app.get("/api/niches/metadata")
+async def api_niche_metadata(current_user: dict = Depends(require_user)):
+    uid = _get_user_id(current_user)
+    if current_user.get("is_guest"):
+        return {"niches": []}
+    return {"niches": get_niche_metadata(uid)}
+
+
 @app.post("/api/feedback")
 async def api_feedback(req: FeedbackRequest, current_user: dict = Depends(require_user)):
     uid = _get_user_id(current_user)
@@ -363,6 +388,128 @@ async def api_trigger(current_user: dict = Depends(require_user)):
     uid = _get_user_id(current_user)
     trigger_recompute(uid)
     return {"status": "recompute_triggered"}
+
+
+# ── History endpoints ───────────────────────────────────────────────────
+
+
+@app.get("/api/history")
+async def api_history(current_user: dict = Depends(require_user)):
+    uid = _get_user_id(current_user)
+    if current_user.get("is_guest"):
+        return {"history": []}
+    return {"history": get_history(uid)}
+
+
+@app.get("/api/history/{history_id}")
+async def api_history_detail(history_id: int, current_user: dict = Depends(require_user)):
+    uid = _get_user_id(current_user)
+    if current_user.get("is_guest"):
+        raise HTTPException(status_code=403, detail="Guests cannot access history")
+    detail = get_history_detail(uid, history_id)
+    if detail is None:
+        raise HTTPException(status_code=404, detail="History entry not found")
+    return detail
+
+
+@app.delete("/api/history")
+async def api_clear_history(current_user: dict = Depends(require_user)):
+    uid = _get_user_id(current_user)
+    if not current_user.get("is_guest"):
+        clear_history(uid)
+    return {"status": "cleared"}
+
+
+# ── Saved Sets endpoints ────────────────────────────────────────────────
+
+
+@app.get("/api/saved-sets")
+async def api_saved_sets(current_user: dict = Depends(require_user)):
+    uid = _get_user_id(current_user)
+    if current_user.get("is_guest"):
+        return {"saved_sets": []}
+    return {"saved_sets": get_saved_sets(uid)}
+
+
+@app.post("/api/saved-sets")
+async def api_save_new_set(req: SavedSetRequest, current_user: dict = Depends(require_user)):
+    uid = _get_user_id(current_user)
+    if current_user.get("is_guest"):
+        raise HTTPException(status_code=403, detail="Guests cannot save sets")
+    response_dict = {
+        "ranked_tags": [t.model_dump() for t in req.ranked_tags],
+        "gap_tags": [g.model_dump() for g in req.gap_tags],
+        "analytics": req.analytics.model_dump() if req.analytics else {},
+        "mix_summary": req.mix_summary.model_dump() if req.mix_summary else {},
+        "confidence": req.confidence,
+    }
+    set_id = save_set(uid, req.name, req.topic, req.product, req.platform, req.niche, response_dict)
+    return {"status": "saved", "id": set_id}
+
+
+@app.get("/api/saved-sets/{set_id}")
+async def api_saved_set_detail(set_id: int, current_user: dict = Depends(require_user)):
+    uid = _get_user_id(current_user)
+    if current_user.get("is_guest"):
+        raise HTTPException(status_code=403, detail="Guests cannot access saved sets")
+    detail = get_saved_set_detail(uid, set_id)
+    if detail is None:
+        raise HTTPException(status_code=404, detail="Saved set not found")
+    return detail
+
+
+@app.delete("/api/saved-sets/{set_id}")
+async def api_delete_saved_set(set_id: int, current_user: dict = Depends(require_user)):
+    uid = _get_user_id(current_user)
+    if not current_user.get("is_guest"):
+        delete_saved_set(uid, set_id)
+    return {"status": "deleted"}
+
+
+# ── Settings endpoints ──────────────────────────────────────────────────
+
+
+@app.get("/api/settings")
+async def api_get_settings(current_user: dict = Depends(require_user)):
+    uid = _get_user_id(current_user)
+    if current_user.get("is_guest"):
+        return {
+            "preferred_platform": "LinkedIn",
+            "default_niche": "",
+            "default_export_format": "json",
+            "theme": "dark",
+            "sort_preference": "score_desc",
+        }
+    return get_settings(uid)
+
+
+@app.post("/api/settings")
+async def api_save_settings(req: UserSettingsRequest, current_user: dict = Depends(require_user)):
+    uid = _get_user_id(current_user)
+    if current_user.get("is_guest"):
+        return {"status": "skipped"}
+    save_settings(uid, req.model_dump(exclude_none=True))
+    return {"status": "saved"}
+
+
+# ── Dashboard endpoint ──────────────────────────────────────────────────
+
+
+@app.get("/api/dashboard")
+async def api_dashboard(current_user: dict = Depends(require_user)):
+    uid = _get_user_id(current_user)
+    if current_user.get("is_guest"):
+        return {
+            "total_niches": 0,
+            "recommendations_generated": 0,
+            "total_sessions": 0,
+            "blue_ocean_opportunities_found": 0,
+            "most_used_platform": "LinkedIn",
+            "most_used_niche": "gps-telematics",
+            "average_confidence": 0.0,
+            "history_timeline": [],
+        }
+    return get_dashboard_stats(uid)
 
 
 @app.exception_handler(Exception)
