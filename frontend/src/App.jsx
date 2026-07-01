@@ -2,14 +2,20 @@ import { useState, useEffect } from 'react'
 import InputPanel from './components/InputPanel'
 import ResultsTable from './components/ResultsTable'
 import GapFinder from './components/GapFinder'
+import HighCompetitionPanel from './components/HighCompetitionPanel'
+import HiddenGemsPanel from './components/HiddenGemsPanel'
+import RejectedCandidatesPanel from './components/RejectedCandidatesPanel'
 import FeedbackSimulator from './components/FeedbackSimulator'
 import ComparisonView from './components/ComparisonView'
 import DemoMode from './components/DemoMode'
 import AnalyticsCards from './components/AnalyticsCards'
+import MixSummary from './components/MixSummary'
 import PlatformComparison from './components/PlatformComparison'
 import RecommendationHistory, { loadHistory, saveEntry, clearHistory } from './components/RecommendationHistory'
 import ExportReport from './components/ExportReport'
 import EmptyState from './components/EmptyState'
+import SavedSetsPanel from './components/SavedSetsPanel'
+import DashboardPage from './components/DashboardPage'
 import { api, isGuest } from './api'
 
 function slugify(text) {
@@ -38,6 +44,7 @@ export default function App({ onLogout }) {
   const [niches, setNiches] = useState([])
   const [activeNiche, setActiveNiche] = useState('gps-telematics')
   const [showNichePanel, setShowNichePanel] = useState(false)
+  const [currentUser, setCurrentUser] = useState(null)
 
   useEffect(() => {
     api('/api/niches')
@@ -45,6 +52,9 @@ export default function App({ onLogout }) {
         setNiches(data.niches || [])
         setActiveNiche(data.active || 'gps-telematics')
       })
+      .catch(() => {})
+    api('/api/auth/me')
+      .then(u => setCurrentUser(u))
       .catch(() => {})
   }, [])
 
@@ -114,6 +124,44 @@ export default function App({ onLogout }) {
     setHistoryEntries([])
   }
 
+  const handleSavedSetRestore = async (savedSet) => {
+    try {
+      const detail = await api(`/api/saved-sets/${savedSet.id}`)
+      setResults(detail)
+      setTopic(savedSet.topic)
+      setProduct(savedSet.product)
+      setPlatform(savedSet.platform)
+      setTab('results')
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  const handleSaveCurrentSet = async () => {
+    if (!results || currentUser?.is_guest) return
+    const name = prompt('Name this recommendation set:')
+    if (!name) return
+    try {
+      await api('/api/saved-sets', {
+        method: 'POST',
+        body: {
+          name,
+          topic: topic.trim(),
+          product: product.trim(),
+          platform,
+          niche: activeNiche,
+          ranked_tags: results.ranked_tags,
+          gap_tags: results.gap_tags,
+          analytics: results.analytics,
+          mix_summary: results.mix_summary,
+          confidence: results.confidence,
+        },
+      })
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
   const currentNicheName = niches.find(n => n.niche_id === activeNiche)?.display_name || activeNiche
 
   return (
@@ -145,12 +193,7 @@ export default function App({ onLogout }) {
               <button
                 onClick={() => setShowNichePanel(!showNichePanel)}
                 className="text-xs px-2 py-1"
-                style={{
-                  backgroundColor: 'transparent',
-                  border: '1px solid #333',
-                  color: '#888',
-                  cursor: 'pointer',
-                }}
+                style={{ backgroundColor: 'transparent', border: '1px solid #333', color: '#888', cursor: 'pointer' }}
               >
                 + CUSTOM
               </button>
@@ -160,10 +203,17 @@ export default function App({ onLogout }) {
             <div className="flex items-center gap-3 text-xs" style={{ color: '#666' }}>
               <span>Niche: {currentNicheName}</span>
               <span>Confidence: {results.confidence}%</span>
-              {results.fallback_mode && (
-                <span style={{ color: 'var(--accent)' }}>FALLBACK</span>
+              {results.fallback_mode && <span style={{ color: 'var(--accent)' }}>FALLBACK</span>}
+              <ExportReport results={results} topic={topic} product={product} platform={platform} currentUser={currentUser} />
+              {results && !currentUser?.is_guest && (
+                <button
+                  onClick={handleSaveCurrentSet}
+                  className="text-xs px-2 py-1"
+                  style={{ backgroundColor: 'transparent', border: '1px solid #333', color: '#888', cursor: 'pointer' }}
+                >
+                  + SAVE
+                </button>
               )}
-              <ExportReport results={results} topic={topic} product={product} platform={platform} />
             </div>
           )}
           <div className="flex items-center gap-2">
@@ -180,14 +230,7 @@ export default function App({ onLogout }) {
               {demoMode ? 'DEMO ON' : 'DEMO MODE'}
             </button>
             {isGuest() && (
-              <span
-                className="text-xs px-2 py-0.5"
-                style={{
-                  backgroundColor: '#222',
-                  color: '#aa6',
-                  border: '1px solid #443',
-                }}
-              >
+              <span className="text-xs px-2 py-0.5" style={{ backgroundColor: '#222', color: '#aa6', border: '1px solid #443' }}>
                 GUEST
               </span>
             )}
@@ -195,12 +238,7 @@ export default function App({ onLogout }) {
               <button
                 onClick={onLogout}
                 className="text-xs px-3 py-1"
-                style={{
-                  backgroundColor: 'transparent',
-                  color: '#555',
-                  border: '1px solid #333',
-                  cursor: 'pointer',
-                }}
+                style={{ backgroundColor: 'transparent', color: '#555', border: '1px solid #333', cursor: 'pointer' }}
               >
                 {isGuest() ? 'LEAVE GUEST MODE' : 'LOG OUT'}
               </button>
@@ -246,106 +284,69 @@ export default function App({ onLogout }) {
         )}
 
         {!results && !loading && !error && (
-          <EmptyState
-            hasHistory={historyEntries.length > 0}
-            onDemoSelect={handleDemoSelect}
-          />
+          <EmptyState hasHistory={historyEntries.length > 0} onDemoSelect={handleDemoSelect} />
         )}
 
         {results && (
           <div className="mt-8">
             <AnalyticsCards results={results} />
+            {results.mix_summary && <MixSummary mix={results.mix_summary} />}
 
-            <div className="flex gap-0 border-b" style={{ borderColor: '#1C1C1C' }}>
-              <button
-                onClick={() => setTab('results')}
-                className={`px-4 py-2 text-xs ${tab === 'results' ? 'border' : ''}`}
-                style={{
-                  borderColor: tab === 'results' ? '#333' : 'transparent',
-                  borderBottom: 'none',
-                  color: tab === 'results' ? 'var(--text)' : '#555',
-                }}
-              >
-                RANKED TAGS ({results.ranked_tags.length})
-              </button>
-              <button
-                onClick={() => setTab('gaps')}
-                className={`px-4 py-2 text-xs ${tab === 'gaps' ? 'border' : ''}`}
-                style={{
-                  borderColor: tab === 'gaps' ? '#333' : 'transparent',
-                  borderBottom: 'none',
-                  color: tab === 'gaps' ? 'var(--text)' : '#555',
-                }}
-              >
-                BLUE OCEAN ({results.gap_tags.length})
-              </button>
-              <button
-                onClick={() => setTab('feedback')}
-                className={`px-4 py-2 text-xs ${tab === 'feedback' ? 'border' : ''}`}
-                style={{
-                  borderColor: tab === 'feedback' ? '#333' : 'transparent',
-                  borderBottom: 'none',
-                  color: tab === 'feedback' ? 'var(--text)' : '#555',
-                }}
-              >
-                FEEDBACK SIM
-              </button>
-              <button
-                onClick={() => setTab('comparison')}
-                className={`px-4 py-2 text-xs ${tab === 'comparison' ? 'border' : ''}`}
-                style={{
-                  borderColor: tab === 'comparison' ? '#333' : 'transparent',
-                  borderBottom: 'none',
-                  color: tab === 'comparison' ? 'var(--text)' : '#555',
-                }}
-              >
-                COMPARISON
-              </button>
-              <button
-                onClick={() => setTab('platform')}
-                className={`px-4 py-2 text-xs ${tab === 'platform' ? 'border' : ''}`}
-                style={{
-                  borderColor: tab === 'platform' ? '#333' : 'transparent',
-                  borderBottom: 'none',
-                  color: tab === 'platform' ? 'var(--text)' : '#555',
-                }}
-              >
-                PLATFORMS
-              </button>
-              <button
-                onClick={() => setTab('history')}
-                className={`px-4 py-2 text-xs ${tab === 'history' ? 'border' : ''}`}
-                style={{
-                  borderColor: tab === 'history' ? '#333' : 'transparent',
-                  borderBottom: 'none',
-                  color: tab === 'history' ? 'var(--text)' : '#555',
-                }}
-              >
-                HISTORY ({historyEntries.length})
-              </button>
+            <div className="flex gap-0 border-b overflow-x-auto" style={{ borderColor: '#1C1C1C' }}>
+              {[
+                { key: 'results', label: 'RANKED', count: results.ranked_tags?.length },
+                { key: 'gaps', label: 'BLUE OCEAN', count: results.gap_tags?.length },
+                { key: 'high_comp', label: 'HIGH COMP', count: results.high_competition_tags?.length },
+                { key: 'gems', label: 'GEMS', count: results.hidden_gems?.length },
+                { key: 'rejected', label: 'REJECTED', count: results.rejected_candidates?.length },
+                { key: 'feedback', label: 'FEEDBACK' },
+                { key: 'comparison', label: 'COMPARE' },
+                { key: 'platform', label: 'PLATFORMS' },
+                { key: 'history', label: 'HISTORY', count: historyEntries.length },
+                { key: 'saved', label: 'SAVED' },
+                { key: 'dashboard', label: 'DASHBOARD' },
+              ].map(t => (
+                <button
+                  key={t.key}
+                  onClick={() => setTab(t.key)}
+                  className={`px-3 py-2 text-xs whitespace-nowrap ${tab === t.key ? 'border' : ''}`}
+                  style={{
+                    borderColor: tab === t.key ? '#333' : 'transparent',
+                    borderBottom: 'none',
+                    color: tab === t.key ? 'var(--text)' : '#555',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {t.label}{t.count !== undefined ? ` (${t.count})` : ''}
+                </button>
+              ))}
             </div>
 
             <div className="border border-t-0 p-6" style={{ borderColor: '#1C1C1C' }}>
               {tab === 'results' && <ResultsTable tags={results.ranked_tags} />}
               {tab === 'gaps' && <GapFinder gaps={results.gap_tags} />}
+              {tab === 'high_comp' && <HighCompetitionPanel tags={results.high_competition_tags} />}
+              {tab === 'gems' && <HiddenGemsPanel gems={results.hidden_gems} />}
+              {tab === 'rejected' && <RejectedCandidatesPanel candidates={results.rejected_candidates} />}
               {tab === 'feedback' && <FeedbackSimulator tags={results.ranked_tags} platform={platform} niche={activeNiche} />}
               {tab === 'comparison' && <ComparisonView tagGenieTags={results.ranked_tags} baselineTags={results.baseline_tags || []} gapTags={results.gap_tags} />}
-              {tab === 'platform' && (
-                <PlatformComparison
-                  topic={topic}
-                  product={product}
-                  niche={activeNiche}
-                  onSelectTag={(tag) => {}}
-                />
-              )}
+              {tab === 'platform' && <PlatformComparison topic={topic} product={product} niche={activeNiche} />}
               {tab === 'history' && (
-                <RecommendationHistory
-                  entries={historyEntries}
-                  onRestore={handleHistoryRestore}
-                  onClear={handleClearHistory}
-                />
+                <RecommendationHistory entries={historyEntries} onRestore={handleHistoryRestore} onClear={handleClearHistory} />
               )}
+              {tab === 'saved' && <SavedSetsPanel currentUser={currentUser} onRestore={handleSavedSetRestore} />}
+              {tab === 'dashboard' && <DashboardPage currentUser={currentUser} />}
             </div>
+          </div>
+        )}
+
+        {!results && !loading && !error && tab !== 'dashboard' && tab !== 'saved' && tab !== 'history' && (
+          <div className="mt-6 border p-6" style={{ borderColor: '#1C1C1C' }}>
+            {tab === 'dashboard' && <DashboardPage currentUser={currentUser} />}
+            {tab === 'saved' && <SavedSetsPanel currentUser={currentUser} />}
+            {tab === 'history' && (
+              <RecommendationHistory entries={historyEntries} onRestore={handleHistoryRestore} onClear={handleClearHistory} />
+            )}
           </div>
         )}
       </main>
@@ -368,27 +369,15 @@ function CustomNichePanel({ onCreated, onClose }) {
   const [editJargon, setEditJargon] = useState('')
   const [editTopics, setEditTopics] = useState('')
 
-  const samplePosts = () => postsText
-    .split('\n')
-    .map(p => p.trim())
-    .filter(p => p.length > 10)
+  const samplePosts = () => postsText.split('\n').map(p => p.trim()).filter(p => p.length > 10)
 
   const handleGenerate = async () => {
     const posts = samplePosts()
-    if (posts.length < 5) {
-      setError(`Need at least 5 sample posts (got ${posts.length})`)
-      return
-    }
-    setGenerating(true)
-    setError('')
+    if (posts.length < 5) { setError(`Need at least 5 sample posts (got ${posts.length})`); return }
+    setGenerating(true); setError('')
     try {
       const data = await api('/api/niches/generate-draft', {
-        method: 'POST',
-        body: {
-          niche_id: slugify(nicheId),
-          display_name: displayName.trim(),
-          sample_posts: posts,
-        },
+        method: 'POST', body: { niche_id: slugify(nicheId), display_name: displayName.trim(), sample_posts: posts },
       })
       const d = data.draft
       setDraft(d)
@@ -397,52 +386,27 @@ function CustomNichePanel({ onCreated, onClose }) {
       setEditTopics(d.sample_topics ? d.sample_topics.join('\n') : '')
       setDescription(d.description || '')
       setStep('review')
-    } catch (e) {
-      setError(e.message)
-    } finally {
-      setGenerating(false)
-    }
+    } catch (e) { setError(e.message) }
+    finally { setGenerating(false) }
   }
 
   const handleSave = async () => {
     const corpus = editCorpus.split('\n').map(l => l.trim()).filter(l => l.length > 5)
     const topics = editTopics.split('\n').map(l => l.trim()).filter(l => l.length > 2)
     let jargon
-    try {
-      jargon = JSON.parse(editJargon)
-    } catch {
-      setError('Invalid JSON in jargon field')
-      return
-    }
-    if (corpus.length < 3) {
-      setError('Need at least 3 corpus entries')
-      return
-    }
-    setSaving(true)
-    setError('')
+    try { jargon = JSON.parse(editJargon) } catch { setError('Invalid JSON in jargon field'); return }
+    if (corpus.length < 3) { setError('Need at least 3 corpus entries'); return }
+    setSaving(true); setError('')
     try {
       const body = {
-        niche_id: draft.niche_id,
-        display_name: draft.display_name,
-        description: description.trim(),
-        sample_posts: draft.sample_posts,
-        corpus,
-        jargon,
-        sample_topics: topics,
+        niche_id: draft.niche_id, display_name: draft.display_name, description: description.trim(),
+        sample_posts: draft.sample_posts, corpus, jargon, sample_topics: topics,
       }
-      if (draft.profile) {
-        body.profile = draft.profile
-      }
-      const data = await api('/api/niches/save-draft', {
-        method: 'POST',
-        body,
-      })
+      if (draft.profile) body.profile = draft.profile
+      const data = await api('/api/niches/save-draft', { method: 'POST', body })
       onCreated(data.niche)
-    } catch (e) {
-      setError(e.message)
-    } finally {
-      setSaving(false)
-    }
+    } catch (e) { setError(e.message) }
+    finally { setSaving(false) }
   }
 
   if (step === 'review' && draft) {
@@ -450,109 +414,36 @@ function CustomNichePanel({ onCreated, onClose }) {
       <div className="border p-6 mt-4" style={{ borderColor: 'var(--accent)' }}>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <span className="text-xs px-2 py-0.5" style={{ backgroundColor: 'var(--accent)', color: 'var(--text)' }}>
-              REVIEW NICHE: {draft.display_name}
-            </span>
-            <span className="text-xs" style={{ color: '#555' }}>
-              Edit the auto-generated content before saving
-            </span>
+            <span className="text-xs px-2 py-0.5" style={{ backgroundColor: 'var(--accent)', color: 'var(--text)' }}>REVIEW NICHE: {draft.display_name}</span>
+            <span className="text-xs" style={{ color: '#555' }}>Edit the auto-generated content before saving</span>
           </div>
           <div className="flex gap-2">
-            <button
-              onClick={() => setStep('input')}
-              className="text-xs px-3 py-1"
-              style={{ backgroundColor: 'transparent', border: '1px solid #333', color: '#888', cursor: 'pointer' }}
-            >
-              ← BACK
-            </button>
-            <button
-              onClick={onClose}
-              className="text-xs px-3 py-1"
-              style={{ backgroundColor: 'transparent', border: '1px solid #333', color: '#555', cursor: 'pointer' }}
-            >
-              CANCEL
-            </button>
+            <button onClick={() => setStep('input')} className="text-xs px-3 py-1" style={{ backgroundColor: 'transparent', border: '1px solid #333', color: '#888', cursor: 'pointer' }}>← BACK</button>
+            <button onClick={onClose} className="text-xs px-3 py-1" style={{ backgroundColor: 'transparent', border: '1px solid #333', color: '#555', cursor: 'pointer' }}>CANCEL</button>
           </div>
         </div>
-
         <div className="mb-4">
           <label className="block text-xs mb-1.5" style={{ color: '#555' }}>DESCRIPTION</label>
-          <input
-            type="text"
-            value={description}
-            onChange={e => setDescription(e.target.value)}
-            className="w-full px-3 py-2 text-sm border focus:outline-none"
-            style={{ backgroundColor: 'transparent', borderColor: '#333', color: 'var(--text)' }}
-          />
+          <input type="text" value={description} onChange={e => setDescription(e.target.value)} className="w-full px-3 py-2 text-sm border focus:outline-none" style={{ backgroundColor: 'transparent', borderColor: '#333', color: 'var(--text)' }} />
         </div>
-
         <div className="mb-4">
-          <label className="block text-xs mb-1.5" style={{ color: '#555' }}>
-            SAMPLE TOPICS (one per line)
-          </label>
-          <textarea
-            value={editTopics}
-            onChange={e => setEditTopics(e.target.value)}
-            rows={3}
-            className="w-full px-3 py-2 text-sm border focus:outline-none"
-            style={{ backgroundColor: 'transparent', borderColor: '#333', color: 'var(--text)', resize: 'vertical' }}
-          />
+          <label className="block text-xs mb-1.5" style={{ color: '#555' }}>SAMPLE TOPICS (one per line)</label>
+          <textarea value={editTopics} onChange={e => setEditTopics(e.target.value)} rows={3} className="w-full px-3 py-2 text-sm border focus:outline-none" style={{ backgroundColor: 'transparent', borderColor: '#333', color: 'var(--text)', resize: 'vertical' }} />
         </div>
-
         <div className="mb-4">
-          <label className="block text-xs mb-1.5" style={{ color: '#555' }}>
-            CORPUS / SEED POSTS (one per line, editable)
-          </label>
-          <textarea
-            value={editCorpus}
-            onChange={e => setEditCorpus(e.target.value)}
-            rows={8}
-            className="w-full px-3 py-2 text-sm border focus:outline-none font-mono"
-            style={{ backgroundColor: 'transparent', borderColor: '#333', color: 'var(--text)', resize: 'vertical', fontSize: '11px' }}
-          />
+          <label className="block text-xs mb-1.5" style={{ color: '#555' }}>CORPUS / SEED POSTS (one per line, editable)</label>
+          <textarea value={editCorpus} onChange={e => setEditCorpus(e.target.value)} rows={8} className="w-full px-3 py-2 text-sm border focus:outline-none font-mono" style={{ backgroundColor: 'transparent', borderColor: '#333', color: 'var(--text)', resize: 'vertical', fontSize: '11px' }} />
         </div>
-
-        {draft.profile && (
-          <VocabularyViewer profile={draft.profile} />
-        )}
-
+        {draft.profile && <VocabularyViewer profile={draft.profile} />}
         <div className="flex items-center gap-3">
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="px-6 py-2 text-xs font-medium disabled:opacity-30"
-            style={{
-              backgroundColor: 'var(--accent)',
-              color: 'var(--text)',
-              border: 'none',
-              cursor: saving ? 'wait' : 'pointer',
-            }}
-          >
+          <button onClick={handleSave} disabled={saving} className="px-6 py-2 text-xs font-medium disabled:opacity-30" style={{ backgroundColor: 'var(--accent)', color: 'var(--text)', border: 'none', cursor: saving ? 'wait' : 'pointer' }}>
             {saving ? 'SAVING...' : 'SAVE NICHE'}
           </button>
-          <button
-            onClick={() => setStep('input')}
-            className="px-4 py-2 text-xs"
-            style={{ backgroundColor: 'transparent', border: '1px solid #333', color: '#888', cursor: 'pointer' }}
-          >
-            REGENERATE
-          </button>
-          <span className="text-xs" style={{ color: '#555' }}>
-            {editCorpus.split('\n').filter(l => l.trim().length > 5).length} corpus entries
-          </span>
+          <button onClick={() => setStep('input')} className="px-4 py-2 text-xs" style={{ backgroundColor: 'transparent', border: '1px solid #333', color: '#888', cursor: 'pointer' }}>REGENERATE</button>
+          <span className="text-xs" style={{ color: '#555' }}>{editCorpus.split('\n').filter(l => l.trim().length > 5).length} corpus entries</span>
         </div>
-
-        {draft._fallback && (
-          <div className="mt-3 text-xs" style={{ color: '#aa6' }}>
-            LLM unavailable, used heuristic fallback. Review the generated content carefully.
-          </div>
-        )}
-
-        {error && (
-          <div className="mt-3 text-xs" style={{ color: 'var(--accent)' }}>
-            {error}
-          </div>
-        )}
+        {draft._fallback && <div className="mt-3 text-xs" style={{ color: '#aa6' }}>LLM unavailable, used heuristic fallback. Review the generated content carefully.</div>}
+        {error && <div className="mt-3 text-xs" style={{ color: 'var(--accent)' }}>{error}</div>}
       </div>
     )
   }
@@ -561,98 +452,36 @@ function CustomNichePanel({ onCreated, onClose }) {
     <div className="border p-6 mt-4" style={{ borderColor: 'var(--accent)' }}>
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <span className="text-xs px-2 py-0.5" style={{ backgroundColor: 'var(--accent)', color: 'var(--text)' }}>
-            CREATE CUSTOM NICHE
-          </span>
-          <span className="text-xs" style={{ color: '#555' }}>
-            Paste 5+ sample posts to generate a draft, then review before saving
-          </span>
+          <span className="text-xs px-2 py-0.5" style={{ backgroundColor: 'var(--accent)', color: 'var(--text)' }}>CREATE CUSTOM NICHE</span>
+          <span className="text-xs" style={{ color: '#555' }}>Paste 5+ sample posts to generate a draft, then review before saving</span>
         </div>
-        <button
-          onClick={onClose}
-          className="text-xs px-3 py-1"
-          style={{ backgroundColor: 'transparent', border: '1px solid #333', color: '#555', cursor: 'pointer' }}
-        >
-          CLOSE
-        </button>
+        <button onClick={onClose} className="text-xs px-3 py-1" style={{ backgroundColor: 'transparent', border: '1px solid #333', color: '#555', cursor: 'pointer' }}>CLOSE</button>
       </div>
-
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
         <div>
           <label className="block text-xs mb-1.5" style={{ color: '#555' }}>NICHE ID</label>
-          <input
-            type="text"
-            value={nicheId}
-            onChange={e => setNicheId(e.target.value)}
-            placeholder="e.g., my-industry"
-            className="w-full px-3 py-2 text-sm border focus:outline-none"
-            style={{ backgroundColor: 'transparent', borderColor: '#333', color: 'var(--text)' }}
-          />
+          <input type="text" value={nicheId} onChange={e => setNicheId(e.target.value)} placeholder="e.g., my-industry" className="w-full px-3 py-2 text-sm border focus:outline-none" style={{ backgroundColor: 'transparent', borderColor: '#333', color: 'var(--text)' }} />
         </div>
         <div>
           <label className="block text-xs mb-1.5" style={{ color: '#555' }}>DISPLAY NAME</label>
-          <input
-            type="text"
-            value={displayName}
-            onChange={e => setDisplayName(e.target.value)}
-            placeholder="e.g., My Industry"
-            className="w-full px-3 py-2 text-sm border focus:outline-none"
-            style={{ backgroundColor: 'transparent', borderColor: '#333', color: 'var(--text)' }}
-          />
+          <input type="text" value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="e.g., My Industry" className="w-full px-3 py-2 text-sm border focus:outline-none" style={{ backgroundColor: 'transparent', borderColor: '#333', color: 'var(--text)' }} />
         </div>
         <div>
           <label className="block text-xs mb-1.5" style={{ color: '#555' }}>DESCRIPTION (optional)</label>
-          <input
-            type="text"
-            value={description}
-            onChange={e => setDescription(e.target.value)}
-            placeholder="Brief description of the industry"
-            className="w-full px-3 py-2 text-sm border focus:outline-none"
-            style={{ backgroundColor: 'transparent', borderColor: '#333', color: 'var(--text)' }}
-          />
+          <input type="text" value={description} onChange={e => setDescription(e.target.value)} placeholder="Brief description of the industry" className="w-full px-3 py-2 text-sm border focus:outline-none" style={{ backgroundColor: 'transparent', borderColor: '#333', color: 'var(--text)' }} />
         </div>
       </div>
-
       <div className="mb-4">
-        <label className="block text-xs mb-1.5" style={{ color: '#555' }}>
-          SAMPLE POSTS (one per line, minimum 5)
-        </label>
-        <textarea
-          value={postsText}
-          onChange={e => setPostsText(e.target.value)}
-          placeholder="Paste one social media post per line from your industry"
-          rows={8}
-          className="w-full px-3 py-2 text-sm border focus:outline-none"
-          style={{ backgroundColor: 'transparent', borderColor: '#333', color: 'var(--text)', resize: 'vertical' }}
-        />
+        <label className="block text-xs mb-1.5" style={{ color: '#555' }}>SAMPLE POSTS (one per line, minimum 5)</label>
+        <textarea value={postsText} onChange={e => setPostsText(e.target.value)} placeholder="Paste one social media post per line from your industry" rows={8} className="w-full px-3 py-2 text-sm border focus:outline-none" style={{ backgroundColor: 'transparent', borderColor: '#333', color: 'var(--text)', resize: 'vertical' }} />
       </div>
-
       <div className="flex items-center gap-3">
-        <button
-          onClick={handleGenerate}
-          disabled={generating}
-          className="px-6 py-2 text-xs font-medium disabled:opacity-30"
-          style={{
-            backgroundColor: 'var(--accent)',
-            color: 'var(--text)',
-            border: 'none',
-            cursor: generating ? 'wait' : 'pointer',
-          }}
-        >
+        <button onClick={handleGenerate} disabled={generating} className="px-6 py-2 text-xs font-medium disabled:opacity-30" style={{ backgroundColor: 'var(--accent)', color: 'var(--text)', border: 'none', cursor: generating ? 'wait' : 'pointer' }}>
           {generating ? 'GENERATING...' : 'GENERATE DRAFT'}
         </button>
-        {samplePosts().length > 0 && (
-          <span className="text-xs" style={{ color: '#555' }}>
-            {samplePosts().length} posts
-          </span>
-        )}
+        {samplePosts().length > 0 && <span className="text-xs" style={{ color: '#555' }}>{samplePosts().length} posts</span>}
       </div>
-
-      {error && (
-        <div className="mt-3 text-xs" style={{ color: 'var(--accent)' }}>
-          {error}
-        </div>
-      )}
+      {error && <div className="mt-3 text-xs" style={{ color: 'var(--accent)' }}>{error}</div>}
     </div>
   )
 }
@@ -669,9 +498,7 @@ function VocabularyViewer({ profile }) {
 
   return (
     <div className="mb-4">
-      <label className="block text-xs mb-2" style={{ color: '#555' }}>
-        INDUSTRY VOCABULARY PROFILE
-      </label>
+      <label className="block text-xs mb-2" style={{ color: '#555' }}>INDUSTRY VOCABULARY PROFILE</label>
       <div className="grid grid-cols-2 gap-2">
         {categories.map(cat => {
           const terms = profile[cat.key] || []
@@ -681,10 +508,7 @@ function VocabularyViewer({ profile }) {
               <div className="text-xs" style={{ color: '#888', maxHeight: '120px', overflowY: 'auto' }}>
                 {terms.length > 0
                   ? terms.map((t, i) => (
-                      <span key={i} className="inline-block mr-1 mb-0.5 px-1.5 py-0.5"
-                        style={{ backgroundColor: '#141414', color: '#ccc' }}>
-                        {t}
-                      </span>
+                      <span key={i} className="inline-block mr-1 mb-0.5 px-1.5 py-0.5" style={{ backgroundColor: '#141414', color: '#ccc' }}>{t}</span>
                     ))
                   : <span style={{ color: '#444' }}>—</span>
                 }

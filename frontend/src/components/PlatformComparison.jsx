@@ -7,7 +7,6 @@ const ALL_PLATFORMS = ['LinkedIn', 'Instagram', 'X', 'TikTok']
 export default function PlatformComparison({ topic, product, niche, onSelectTag }) {
   const [results, setResults] = useState({})
   const [loading, setLoading] = useState(false)
-  const [sharedTags, setSharedTags] = useState([])
 
   useEffect(() => {
     if (!topic || !product) return
@@ -24,12 +23,6 @@ export default function PlatformComparison({ topic, product, niche, onSelectTag 
       const byPlatform = {}
       all.forEach(({ platform, data }) => { byPlatform[platform] = data })
       setResults(byPlatform)
-
-      const first = all[0]?.data?.ranked_tags?.map(t => getRecommendationLabel(t)) || []
-      const shared = first.filter(tag =>
-        all.every(r => r.data?.ranked_tags?.some(t => getRecommendationLabel(t) === tag))
-      )
-      setSharedTags(shared)
       setLoading(false)
     }).catch(() => {
       if (!cancelled) setLoading(false)
@@ -57,12 +50,6 @@ export default function PlatformComparison({ topic, product, niche, onSelectTag 
         </div>
       )}
 
-      {!loading && sharedTags.length > 0 && (
-        <div className="mb-4 text-xs" style={{ color: '#555' }}>
-          <span style={{ color: '#888' }}>{sharedTags.length} shared</span> across all platforms
-        </div>
-      )}
-
       <div className="grid grid-cols-4 gap-0 border" style={{ borderColor: '#1C1C1C' }}>
         {ALL_PLATFORMS.map((platform, pi) => {
           const data = results[platform]
@@ -74,7 +61,6 @@ export default function PlatformComparison({ topic, product, niche, onSelectTag 
               </div>
               {tags.slice(0, 8).map((t, i) => {
                 const label = getRecommendationLabel(t)
-                const isShared = sharedTags.includes(label)
                 const finalScore = safeNumber(t?.final_score)
                 return (
                   <div
@@ -85,9 +71,7 @@ export default function PlatformComparison({ topic, product, niche, onSelectTag 
                   >
                     <div className="flex items-center gap-1.5 min-w-0">
                       <span className="text-xs" style={{ color: '#444' }}>{i + 1}</span>
-                      <span className="text-xs truncate" style={{ color: isShared ? 'var(--accent)' : 'var(--text)' }}>
-                        {label}
-                      </span>
+                      <span className="text-xs truncate" style={{ color: 'var(--text)' }}>{label}</span>
                     </div>
                     <span className="text-xs flex-shrink-0 ml-1" style={{ color: '#555' }}>
                       {formatScore(finalScore)}

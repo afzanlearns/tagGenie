@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import DetailsDrawer from './DetailsDrawer'
-import { getRecommendationLabel, getRecommendationType, formatScore, safeNumber } from '../recommendation'
+import { getRecommendationLabel, getRecommendationType, formatScore, safeNumber, confidenceBand } from '../recommendation'
 
 export default function ComparisonView({ tagGenieTags, baselineTags, gapTags }) {
   const [selectedTag, setSelectedTag] = useState(null)
@@ -29,30 +29,20 @@ export default function ComparisonView({ tagGenieTags, baselineTags, gapTags }) 
             const tag = tagGenieTags[i]
             return (
               <div
-                  key={`tg-${i}`}
-                  className="px-4 py-2.5 flex items-center justify-between cursor-pointer"
-                  style={{ borderBottom: '1px solid #141414' }}
-                  onClick={() => tag && setSelectedTag(tag)}
-                >
-                  {tag ? (
-                    <>
-                      <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-xs" style={{ color: '#444', flexShrink: 0 }}>
-                        {i + 1}
-                      </span>
+                key={`tg-${i}`}
+                className="px-4 py-2.5 flex items-center justify-between cursor-pointer"
+                style={{ borderBottom: '1px solid #141414' }}
+                onClick={() => tag && setSelectedTag(tag)}
+              >
+                {tag ? (
+                  <>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-xs" style={{ color: '#444', flexShrink: 0 }}>{i + 1}</span>
                       {gapSet.has(getRecommendationLabel(tag)) && (
-                        <span className="text-xs" style={{ color: 'var(--accent)', flexShrink: 0 }} title="Blue ocean gap">
-                          ◆
-                        </span>
+                        <span className="text-xs" style={{ color: 'var(--accent)', flexShrink: 0 }} title="Blue ocean gap">◆</span>
                       )}
                       <div className="flex flex-col min-w-0">
-                        <span
-                          className="text-sm truncate"
-                          style={{
-                            color: 'var(--text)',
-                            fontWeight: i === 0 ? 700 : 400,
-                          }}
-                        >
+                        <span className="text-sm truncate" style={{ color: 'var(--text)', fontWeight: i === 0 ? 700 : 400 }}>
                           {getRecommendationType(tag) === 'hashtag' ? '#' : ''}{getRecommendationLabel(tag)}
                         </span>
                         <div className="flex gap-2 text-xs mt-0.5" style={{ color: '#555' }}>
@@ -64,9 +54,7 @@ export default function ComparisonView({ tagGenieTags, baselineTags, gapTags }) 
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                      <span className="text-xs" style={{ color: '#888' }}>
-                        {formatScore(safeNumber(tag?.final_score))}
-                      </span>
+                      <span className="text-xs" style={{ color: '#888' }}>{formatScore(safeNumber(tag?.final_score))}</span>
                     </div>
                   </>
                 ) : (
@@ -80,37 +68,25 @@ export default function ComparisonView({ tagGenieTags, baselineTags, gapTags }) 
         <div>
           <div className="px-4 py-2 border-b" style={{ borderColor: '#1C1C1C', backgroundColor: '#0F0F0F' }}>
             <span className="text-xs font-medium" style={{ color: '#888' }}>NAIVE BASELINE</span>
-            <span className="text-xs ml-2" style={{ color: '#555' }}>
-              TF-IDF keywords only
-            </span>
+            <span className="text-xs ml-2" style={{ color: '#555' }}>TF-IDF keywords only</span>
           </div>
           {Array.from({ length: maxRows }).map((_, i) => {
             const tag = baselineTags[i]
             return (
-              <div
-                key={`bl-${i}`}
-                className="px-4 py-2.5 flex items-center justify-between"
-                style={{ borderBottom: '1px solid #141414' }}
-              >
+              <div key={`bl-${i}`} className="px-4 py-2.5 flex items-center justify-between" style={{ borderBottom: '1px solid #141414' }}>
                 {tag ? (
                   <>
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-xs" style={{ color: '#444', flexShrink: 0 }}>
-                        {i + 1}
-                      </span>
+                      <span className="text-xs" style={{ color: '#444', flexShrink: 0 }}>{i + 1}</span>
                       <div className="flex flex-col min-w-0">
                         <span className="text-sm truncate" style={{ color: '#888' }}>
                           {getRecommendationType(tag) === 'hashtag' ? '#' : ''}{getRecommendationLabel(tag)}
                         </span>
-                        <span className="text-xs mt-0.5" style={{ color: '#555' }}>
-                          R:{formatScore(safeNumber(tag?.semantic_relevance))}
-                        </span>
+                        <span className="text-xs mt-0.5" style={{ color: '#555' }}>R:{formatScore(safeNumber(tag?.semantic_relevance))}</span>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                      <span className="text-xs" style={{ color: '#666' }}>
-                        {formatScore(safeNumber(tag?.score))}
-                      </span>
+                      <span className="text-xs" style={{ color: '#666' }}>{formatScore(safeNumber(tag?.score))}</span>
                     </div>
                   </>
                 ) : (

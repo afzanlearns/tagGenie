@@ -14,17 +14,13 @@ export function getRecommendationType(tag) {
 }
 
 export function getCategory(tag) {
+  if (tag == null) return 'Other'
+  if (tag && typeof tag.category === 'string' && tag.category) return tag.category
   const label = getRecommendationLabel(tag)
   if (!label) return 'Other'
   const type = getRecommendationType(tag)
   if (type === 'hashtag') return 'Hashtag'
-  const t = label.toLowerCase()
-  if (t.endsWith('industry') || t.includes('sector') || t.includes('market') || t.includes('supply chain')) return 'Industry'
-  if (t.includes('brand') || t.endsWith('pro') || t.includes('product')) return 'Brand'
-  if (t.includes('lover') || t.includes('enthusiast') || t.includes('community') || t.includes('farmer') || t.includes('buyer') || t.includes('professional')) return 'Audience'
-  if (t.includes('trend') || t.includes('innovation') || t.includes('future') || t.includes('best') || t.includes('top')) return 'Topic'
-  if (t.includes('roast') || t.includes('brew') || t.includes('process') || t.includes('grade') || t.includes('certification')) return 'Process'
-  return 'Industry'
+  return 'Keyword'
 }
 
 export function formatScore(v) {
@@ -40,4 +36,19 @@ export function formatScoreOne(v) {
 export function safeNumber(v, fallback = 0) {
   if (v == null || typeof v !== 'number') return fallback
   return v
+}
+
+export function confidenceBand(score) {
+  if (score >= 90) return { label: 'Excellent', color: '#4caf50' }
+  if (score >= 80) return { label: 'Very Strong', color: '#8bc34a' }
+  if (score >= 70) return { label: 'Strong', color: '#d42b2b' }
+  if (score >= 60) return { label: 'Moderate', color: '#b8860b' }
+  return { label: 'Weak', color: '#555' }
+}
+
+export function competitionLevel(score) {
+  if (score >= 75) return { label: 'Very High', color: '#d42b2b' }
+  if (score >= 55) return { label: 'High', color: '#b8860b' }
+  if (score >= 35) return { label: 'Moderate', color: '#888' }
+  return { label: 'Low', color: '#6a6' }
 }

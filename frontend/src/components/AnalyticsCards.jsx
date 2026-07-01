@@ -1,22 +1,27 @@
 import { safeNumber } from '../recommendation'
 
 export default function AnalyticsCards({ results }) {
-  if (!results || !results.ranked_tags) return null
+  if (!results) return null
 
-  const tags = results.ranked_tags
+  const analytics = results.analytics || {}
+  const ranked = results.ranked_tags || []
   const gaps = results.gap_tags || []
-
-  const avgRel = tags.reduce((s, t) => s + safeNumber(t?.semantic_relevance), 0) / tags.length
-  const avgTrend = tags.reduce((s, t) => s + safeNumber(t?.trend_score), 0) / tags.length
-  const avgComp = tags.reduce((s, t) => s + safeNumber(t?.competition_score), 0) / tags.length
+  const highComp = results.high_competition_tags || []
+  const hiddenGems = results.hidden_gems || []
 
   const cards = [
-    { label: 'RECOMMENDATIONS', value: tags.length, sub: results.platform },
-    { label: 'AVG RELEVANCE', value: avgRel.toFixed(0), sub: '/100' },
-    { label: 'AVG TREND', value: avgTrend.toFixed(0), sub: '/100' },
-    { label: 'AVG COMPETITION', value: avgComp.toFixed(0), sub: '/100 (lower=better)' },
+    { label: 'RECOMMENDATIONS', value: ranked.length, sub: results.platform },
+    { label: 'AVG RELEVANCE', value: safeNumber(analytics?.avg_relevance).toFixed(0), sub: '/100' },
+    { label: 'AVG TREND', value: safeNumber(analytics?.avg_trend).toFixed(0), sub: '/100' },
+    { label: 'AVG COMPETITION', value: safeNumber(analytics?.avg_competition).toFixed(0), sub: '/100' },
+    { label: 'AVG PLATFORM FIT', value: safeNumber(analytics?.avg_platform_fit).toFixed(0), sub: '/100' },
+    { label: 'AVG FINAL SCORE', value: safeNumber(analytics?.avg_final_score).toFixed(0), sub: '/100' },
     { label: 'BLUE OCEAN', value: gaps.length, sub: 'opportunities' },
-    { label: 'CONFIDENCE', value: results.confidence.toFixed(0), sub: '%' },
+    { label: 'HIGH COMPETITION', value: highComp.length, sub: 'avoid' },
+    { label: 'HIDDEN GEMS', value: hiddenGems.length, sub: 'long-tail' },
+    { label: 'UNIQUE CATEGORIES', value: analytics?.unique_categories || 0, sub: 'types' },
+    { label: 'DIVERSITY', value: `${safeNumber(analytics?.diversity).toFixed(0)}%`, sub: 'spread' },
+    { label: 'CONFIDENCE', value: safeNumber(results.confidence).toFixed(0), sub: '%' },
   ]
 
   return (
